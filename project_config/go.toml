@@ -90,3 +90,7 @@ It is mandatory to prepend the <end_of_output> at the very end of your output.
 
 Provided code:
 """
+
+simple_package_summary_prompt = """
+Make a summary for this code package, and at the end of a summary add '<end_of_summary>' 
+"""

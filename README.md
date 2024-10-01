@@ -68,6 +68,6 @@ This command will run the Reflexia project using the configuration file `config.
 
 
 ```bash
-./reflexia -l go.toml -f -bp -g https://github.com/JackBekket/Hellper
+./reflexia -l go.toml -f -d  -g https://github.com/JackBekket/Hellper
 ```
 This command will start to autodocumentize -g repository (public), it will create README_GENERATED.MD and create summary for all files
