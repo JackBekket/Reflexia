@@ -4,3 +4,6 @@ MODEL="tiger-gemma-9b-v1-i1"
 #MODEL="deepseek-coder-6b-instruct"
 #MODEL="wizard-uncensored-code-34b"
 STOP_WORD="<help_me_banana>"
+LOCALAIKEY=
+POSTGRESLINK=postgresql://
+BASELINK=http://

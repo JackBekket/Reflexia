@@ -12,14 +12,14 @@ import (
 	"slices"
 	"strings"
 
+	util "github.com/JackBekket/reflexia/internal"
+	embedding "github.com/JackBekket/reflexia/internal/embeddings"
+	"github.com/JackBekket/reflexia/pkg/project"
+	"github.com/JackBekket/reflexia/pkg/summarize"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
-
-	util "github.com/JackBekket/reflexia/internal"
-	"github.com/JackBekket/reflexia/pkg/project"
-	"github.com/JackBekket/reflexia/pkg/summarize"
 )
 
 type Config struct {
@@ -32,6 +32,7 @@ type Config struct {
 	WithFileSummary bool
 	OverwriteReadme bool
 	OverwriteCache  bool
+	WithEmbeddings  bool
 	CachePath       *string
 }
 
@@ -132,6 +133,14 @@ func main() {
 			pkgSummaryContent,
 		); err != nil {
 			log.Fatal(err)
+		}
+
+		if config.WithEmbeddings {
+			baseLink := loadEnv("BASELINK")
+			pglink := loadEnv("POSTGRESLINK")
+			laikey := loadEnv("LOCALAIKEY")
+			//TODO: what do we use as reponame? Don't think it's pkgDir, ask about it. Same shit for package_name.
+			embedding.LoadSummary(baseLink, laikey, pglink, "PLACEHOLDER FOR REPONAME", pkgSummaryContent, "PLACEHOLDER FOR PACKAGE NAME")
 		}
 
 		if config.WithFileSummary {
@@ -300,6 +309,7 @@ func initConfig() (*Config, error) {
 	config.WithFileSummary = false
 	config.OverwriteReadme = false
 	config.OverwriteCache = false
+	config.WithEmbeddings = false
 
 	flag.BoolFunc("c",
 		"do not check project root folder specific files such as go.mod or package.json",
@@ -323,6 +333,14 @@ func initConfig() (*Config, error) {
 		"Overwrite generated summary caches",
 		func(_ string) error {
 			config.OverwriteCache = true
+			return nil
+		})
+
+	// Adding the -e flag for WithEmbeddings
+	flag.BoolFunc("e",
+		"Enable embeddings processing",
+		func(_ string) error {
+			config.WithEmbeddings = true
 			return nil
 		})
 
