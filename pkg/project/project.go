@@ -149,13 +149,16 @@ func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
 			pc.RootPath,
 			filepath.Join(pc.RootPath, ".gitignore"),
 			func(path string, d fs.DirEntry) error {
+				if filepath.Dir(path) == pc.RootPath || path == pc.RootPath {
+					return nil
+				}
 				for _, filter := range pc.FileFilter {
 					if strings.HasSuffix(d.Name(), filter) {
-						key := filepath.Base(filepath.Dir(path))
 						relPath, err := filepath.Rel(pc.RootPath, path)
 						if err != nil {
 							return err
 						}
+						key := filepath.Dir(relPath)
 
 						if _, exists := packageFileMap[key]; !exists {
 							packageFileMap[key] = []string{}

@@ -75,21 +75,29 @@ func (s *SummarizerService) SummarizeCode(
 					if err != nil {
 						return err
 					}
+
 					relPath, err := filepath.Rel(projectConfig.RootPath, path)
 					if err != nil {
 						return err
 					}
 					fmt.Println(relPath)
 
-					response := cacheFileMap[relPath]
-					if response == "" {
-						response, err = s.CodeSummaryRequest(
-							projectConfig.CodeSummaryPrompt, string(content))
-						if err != nil {
-							return err
+					contentStr := string(content)
+					response := "Empty file"
+
+					if len(strings.TrimSpace(contentStr)) > 0 {
+						response = cacheFileMap[relPath]
+						if response == "" {
+							response, err = s.CodeSummaryRequest(
+								projectConfig.CodeSummaryPrompt, string(content))
+							if err != nil {
+								return err
+							}
+						} else {
+							fmt.Println("Using cached result:\n", response)
 						}
 					} else {
-						fmt.Println("Using cached result:\n", response)
+						fmt.Println("Empty file")
 					}
 
 					fmt.Printf("\n")

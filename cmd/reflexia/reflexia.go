@@ -27,6 +27,7 @@ type Config struct {
 	GithubUsername  *string
 	GithubToken     *string
 	WithConfigFile  *string
+	ExactPackages   *string
 	LightCheck      bool
 	WithFileSummary bool
 	OverwriteReadme bool
@@ -80,7 +81,11 @@ func main() {
 	}
 
 	for pkg, files := range pkgFiles {
-		fmt.Printf("\n%s:\n", pkg)
+		if *config.ExactPackages != "" &&
+			!slices.Contains(strings.Split(*config.ExactPackages, ","), pkg) {
+			continue
+		}
+		fmt.Printf("\nPackage %s\n", pkg)
 
 		pkgFileMap := map[string]string{}
 		pkgDir := ""
@@ -112,7 +117,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("\nSummary for a package: ")
+		fmt.Printf("\nSummary for a package %s: \n", pkg)
 		fmt.Println(pkgSummaryContent)
 
 		readmeFilename := "README.md"
@@ -275,6 +280,7 @@ func initConfig() (*Config, error) {
 
 	config.GithubLink = flag.String("g", "", "valid link for github repository")
 	config.GithubUsername = flag.String("u", "", "github username for ssh auth")
+	config.ExactPackages = flag.String("p", "", "exact package names, ',' delimited")
 
 	githubToken := os.Getenv("GH_TOKEN")
 	config.GithubToken = &githubToken
