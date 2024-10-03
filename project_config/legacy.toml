@@ -34,19 +34,7 @@ func main():
 
 Provided code:
 """
-summary_prompt = """
-Based on provided input from summary of the project files create a markdown summary of what that project code does.
-First write a short summary about provided project code summary.
-Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration.
-Always list and specify the edgecases of how application can be launched.
-Try to guess the project name from the filenames if possible and add it as the markdown header of the summary.
-Then write summary about every major code part, group it with the markdown subheaders.
-Try to explain relations between code entities, try to find unclear places, possibly dead code.		
-If unclear places or dead code are not present - don't write anything about their absense.
-Try to be clear, concise, and brief.
-The main goal is to summarize the logic of the whole project.
-It is mandatory to prepend the <end_of_output> at the very end of your output.
-"""
+
 package_prompt = """
 Based on provided input from the summary of project package files create a markdown summary of what that package code does.
 First write a short summary about provided project code summary.
@@ -59,13 +47,5 @@ Try to explain relations between code entities, try to find unclear places, poss
 If unclear places or dead code are not present - don't write anything about their absense.
 Try to be clear, concise, and brief.
 The main goal is to summarize the logic of the whole package.
-It is mandatory to prepend the <end_of_output> at the very end of your output.
-"""
-readme_prompt = """
-Based on provided input from technical summary of the project create a README.md contents for that project.
-Try to guess the project name from filenames or other namings, if present.
-Include short project description, possible configuration and/or run instructions.
-Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration.
-Try to be clear, concise, and brief.
 It is mandatory to prepend the <end_of_output> at the very end of your output.
 """

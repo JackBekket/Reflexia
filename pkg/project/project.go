@@ -1,8 +1,6 @@
 package project
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"go/parser"
@@ -12,7 +10,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -22,17 +19,15 @@ import (
 )
 
 type ProjectConfig struct {
-	FileFilter        []string `toml:"file_filter"`
-	ProjectRootFilter []string `toml:"project_root_filter"`
-	ModuleMatch       string   `toml:"module_match"`
-	StopWords         []string `toml:"stop_words"`
-	CodePrompt        string   `toml:"code_prompt"`
-	ExplainPrompt     string   `toml:"explain_code_prompt"`
-	CodeSummaryPrompt string   `toml:"code_summary_prompt"`
-	SummaryPrompt     string   `toml:"summary_prompt"`
-	PackagePrompt     string   `toml:"package_prompt"`
-	ReadmePrompt      string   `toml:"readme_prompt"`
-	RootPath          string
+	FileFilter            []string `toml:"file_filter"`
+	ProjectRootFilter     []string `toml:"project_root_filter"`
+	ModuleMatch           string   `toml:"module_match"`
+	StopWords             []string `toml:"stop_words"`
+	CodePrompt            string   `toml:"code_prompt"`
+	CodePromptFallback    *string  `toml:"code_prompt_fallback"`
+	PackagePrompt         string   `toml:"package_prompt"`
+	PackagePromptFallback *string  `toml:"package_prompt_fallback"`
+	RootPath              string
 }
 
 func GetProjectConfig(
@@ -113,32 +108,6 @@ func GetProjectConfig(
 		}
 	}
 	panic("unreachable")
-}
-
-func (pc *ProjectConfig) ProjectHash() (string, error) {
-	hash := sha256.New()
-
-	v := reflect.ValueOf(*pc)
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldType := field.Type()
-
-		if fieldType.Kind() == reflect.String {
-			if _, err := hash.Write([]byte(field.String())); err != nil {
-				return "", err
-			}
-		}
-
-		if fieldType.Kind() == reflect.Slice && fieldType.Elem().Kind() == reflect.String {
-			joinedStrings := strings.Join(field.Interface().([]string), "")
-			if _, err := hash.Write([]byte(joinedStrings)); err != nil {
-				return "", err
-			}
-		}
-	}
-
-	hashBytes := hash.Sum(nil)
-	return hex.EncodeToString(hashBytes), nil
 }
 
 func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {

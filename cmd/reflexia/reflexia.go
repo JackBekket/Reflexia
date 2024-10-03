@@ -68,17 +68,15 @@ func main() {
 		CachePath:      *config.CachePath,
 	}
 
-	// Generates summary for a file content
-	// return the map of fileMap[relPath] = generation_content
-	fileMap, err := summarizeService.SummarizeCode(projectConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	pkgFiles, err := projectConfig.BuildPackageFiles()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fallbackFileResponses := []string{}
+	emptyFileResponses := []string{}
+	fallbackPackageResponses := []string{}
+	emptyPackageResponses := []string{}
 
 	for pkg, files := range pkgFiles {
 		if *config.ExactPackages != "" &&
@@ -89,12 +87,53 @@ func main() {
 
 		pkgFileMap := map[string]string{}
 		pkgDir := ""
-		for file, content := range fileMap {
-			if slices.Contains(files, file) {
-				if pkgDir == "" {
-					pkgDir = filepath.Join(workdir, filepath.Dir(file))
+		for _, relPath := range files {
+			fmt.Println(relPath)
+			content, err := os.ReadFile(filepath.Join(projectConfig.RootPath, relPath))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			contentStr := string(content)
+			codeSummaryContent := "Empty file"
+
+			if strings.TrimSpace(contentStr) != "" {
+				codeSummaryContent, err = summarizeService.LLMRequest(
+					"%s```%s```",
+					projectConfig.CodePrompt, contentStr,
+				)
+				if err != nil {
+					log.Fatal(err)
 				}
-				pkgFileMap[file] = content
+				if strings.TrimSpace(codeSummaryContent) == "" &&
+					projectConfig.CodePromptFallback != nil {
+					fallbackFileResponses = append(
+						fallbackFileResponses,
+						filepath.Join(projectConfig.RootPath, relPath),
+					)
+					codeSummaryContent, err = summarizeService.LLMRequest(
+						"%s```%s```",
+						*projectConfig.CodePromptFallback, contentStr,
+					)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			} else {
+				fmt.Println("Empty file")
+			}
+
+			fmt.Printf("\n")
+			pkgFileMap[relPath] = codeSummaryContent
+
+			if strings.TrimSpace(codeSummaryContent) == "" {
+				emptyFileResponses = append(
+					emptyFileResponses,
+					filepath.Join(projectConfig.RootPath, relPath),
+				)
+			}
+			if pkgDir == "" {
+				pkgDir = filepath.Join(projectConfig.RootPath, filepath.Dir(relPath))
 			}
 		}
 		if pkgDir == "" {
@@ -102,23 +141,40 @@ func main() {
 			continue
 		}
 
-		projectStructure, err := getDirFileStructure(pkgDir)
+		fileStructure, err := getDirFileStructure(pkgDir)
 		if err != nil {
 			log.Print(err)
 		}
-		fmt.Println(projectStructure)
 
+		fmt.Printf("\nSummary for a package %s: \n", pkg)
 		// Generate Summary for a package (summarizing and group file summarization by package name)
 		// Get whole map of code summaries as a string and toss it to summarize .MD for a package
-		pkgSummaryContent, err := summarizeService.SummarizeRequest(
+		pkgSummaryContent, err := summarizeService.LLMRequest(
+			"%s\n\n%s\n%s",
 			projectConfig.PackagePrompt,
+			fileStructure,
 			fileMapToString(pkgFileMap),
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("\nSummary for a package %s: \n", pkg)
-		fmt.Println(pkgSummaryContent)
+
+		if strings.TrimSpace(pkgSummaryContent) == "" && projectConfig.PackagePromptFallback != nil {
+			fallbackPackageResponses = append(fallbackPackageResponses, pkg)
+			pkgSummaryContent, err = summarizeService.LLMRequest(
+				"%s\n\n%s\n%s",
+				*projectConfig.PackagePromptFallback,
+				fileStructure,
+				fileMapToString(pkgFileMap),
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		if strings.TrimSpace(pkgSummaryContent) == "" {
+			emptyPackageResponses = append(emptyPackageResponses, pkg)
+		}
 
 		readmeFilename := "README.md"
 		if !config.OverwriteReadme {
@@ -144,6 +200,21 @@ func main() {
 		}
 
 	}
+
+	printEmptyWarning("[WARN] %d fallback attempts for files\n", fallbackFileResponses)
+	printEmptyWarning("[WARN] %d empty LLM responses for files\n", emptyFileResponses)
+	printEmptyWarning("[WARN] %d fallback attempts for packages\n", fallbackPackageResponses)
+	printEmptyWarning("[WARN] %d empty LLM responses for packages\n", emptyPackageResponses)
+}
+
+func printEmptyWarning(message string, responses []string) {
+	if len(responses) == 0 {
+		return
+	}
+	fmt.Printf(message, len(responses))
+	for _, response := range responses {
+		fmt.Printf(" - %s\n", response)
+	}
 }
 
 func loadEnv(key string) string {
@@ -156,6 +227,7 @@ func loadEnv(key string) string {
 
 func getDirFileStructure(workdir string) (string, error) {
 	content := fmt.Sprintf("%s directory file structure:\n", filepath.Base(workdir))
+	entries := []string{}
 	if err := util.WalkDirIgnored(workdir, "", func(path string, d fs.DirEntry) error {
 		if d.IsDir() {
 			return nil
@@ -164,26 +236,43 @@ func getDirFileStructure(workdir string) (string, error) {
 		if err != nil {
 			return err
 		}
-		content += "- " + relPath + "\n"
+		if strings.HasSuffix(path, ".md") {
+			return nil
+		}
+		entries = append(entries, relPath)
 		return nil
 	}); err != nil {
 		return "", err
+	}
+	slices.Sort(entries)
+	for _, entry := range entries {
+		content += "- " + entry + "\n"
 	}
 	return content, nil
 }
 
 func fileMapToString(fileMap map[string]string) string {
 	content := ""
-	for file, summary := range fileMap {
-		content += file + "\n" + summary + "\n\n"
+	entries := []string{}
+	for file, _ := range fileMap {
+		entries = append(entries, file)
+	}
+	slices.Sort(entries)
+	for _, file := range entries {
+		content += file + "\n" + fileMap[file] + "\n\n"
 	}
 	return content
 }
 
 func fileMapToMd(fileMap map[string]string) string {
 	content := ""
-	for file, summary := range fileMap {
-		content += "# " + file + "\n" + summary + "\n\n"
+	entries := []string{}
+	for file, _ := range fileMap {
+		entries = append(entries, file)
+	}
+	slices.Sort(entries)
+	for _, file := range entries {
+		content += "# " + file + "\n" + fileMap[file] + "\n\n"
 	}
 	return strings.ReplaceAll(content, "\n", "  \n")
 }
