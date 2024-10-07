@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,23 +17,30 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/schema"
 
+	"github.com/JackBekket/hellper/lib/embeddings"
 	util "github.com/JackBekket/reflexia/internal"
+	store "github.com/JackBekket/reflexia/pkg"
 	"github.com/JackBekket/reflexia/pkg/project"
 	"github.com/JackBekket/reflexia/pkg/summarize"
 )
 
 type Config struct {
-	GithubLink      *string
-	GithubUsername  *string
-	GithubToken     *string
-	WithConfigFile  *string
-	ExactPackages   *string
-	LightCheck      bool
-	WithFileSummary bool
-	OverwriteReadme bool
-	OverwriteCache  bool
-	CachePath       *string
+	GithubLink         *string
+	GithubUsername     *string
+	GithubToken        *string
+	WithConfigFile     *string
+	ExactPackages      *string
+	LightCheck         bool
+	WithFileSummary    bool
+	UseEmbeddings      bool
+	OverwriteReadme    bool
+	OverwriteCache     bool
+	EmbeddingsAIURL    *string
+	EmbeddingsAIAPIKey *string
+	EmbeddingsDBURL    *string
+	CachePath          *string
 }
 
 func main() {
@@ -66,6 +74,23 @@ func main() {
 		},
 		OverwriteCache: config.OverwriteCache,
 		CachePath:      *config.CachePath,
+	}
+	var embeddingsService *store.EmbeddingsService
+	if config.UseEmbeddings {
+		projectName := filepath.Base(projectConfig.RootPath)
+		vectorStore, err := embeddings.GetVectorStoreWithOptions(
+			*config.EmbeddingsAIURL,
+			*config.EmbeddingsAIAPIKey,
+			*config.EmbeddingsDBURL,
+			projectName,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		embeddingsService = &store.EmbeddingsService{
+			Store: vectorStore,
+		}
+		fmt.Printf("Initialized vector store with %s as project name\n", projectName)
 	}
 
 	pkgFiles, err := projectConfig.BuildPackageFiles()
@@ -174,6 +199,24 @@ func main() {
 
 		if strings.TrimSpace(pkgSummaryContent) == "" {
 			emptyPackageResponses = append(emptyPackageResponses, pkg)
+		}
+
+		if embeddingsService != nil {
+			ids, err := embeddingsService.Store.AddDocuments(
+				context.Background(),
+				[]schema.Document{
+					{
+						PageContent: pkgSummaryContent,
+						Metadata: map[string]interface{}{
+							"package": pkg,
+						},
+					},
+				},
+			)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
 		}
 
 		readmeFilename := "README.md"
@@ -385,10 +428,23 @@ func initConfig() (*Config, error) {
 		config.CachePath = &cachePath
 	}
 
+	embAIURL := os.Getenv("EMBEDDINGS_AI_URL")
+	config.EmbeddingsAIURL = &embAIURL
+	flag.StringVar(config.EmbeddingsAIURL, "eu", *config.EmbeddingsAIURL, "Embeddings AI URL")
+
+	embAIAPIKey := os.Getenv("EMBEDDINGS_AI_KEY")
+	config.EmbeddingsAIAPIKey = &embAIAPIKey
+	flag.StringVar(config.EmbeddingsAIAPIKey, "ea", *config.EmbeddingsAIAPIKey, "Embeddings AI API Key")
+
+	embDBURL := os.Getenv("EMBEDDINGS_DB_URL")
+	config.EmbeddingsDBURL = &embDBURL
+	flag.StringVar(config.EmbeddingsDBURL, "ed", *config.EmbeddingsDBURL, "Embeddings pgxpool DB connect URL")
+
 	config.LightCheck = false
 	config.WithFileSummary = false
 	config.OverwriteReadme = false
 	config.OverwriteCache = false
+	config.UseEmbeddings = false
 
 	flag.BoolFunc("c",
 		"do not check project root folder specific files such as go.mod or package.json",
@@ -412,6 +468,11 @@ func initConfig() (*Config, error) {
 		"Overwrite generated summary caches",
 		func(_ string) error {
 			config.OverwriteCache = true
+			return nil
+		})
+	flag.BoolFunc("e", "Use Embeddings",
+		func(_ string) error {
+			config.UseEmbeddings = true
 			return nil
 		})
 
