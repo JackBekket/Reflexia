@@ -150,6 +150,32 @@ func main() {
 
 			fmt.Printf("\n")
 			pkgFileMap[relPath] = codeSummaryContent
+			if embeddingsService != nil {
+				ids, err := embeddingsService.Store.AddDocuments(
+					context.Background(),
+					[]schema.Document{
+						{
+							PageContent: string(content),
+							Metadata: map[string]interface{}{
+								"package":  pkg,
+								"filename": relPath,
+								"type":     "code",
+							},
+						}, {
+							PageContent: codeSummaryContent,
+							Metadata: map[string]interface{}{
+								"package":  pkg,
+								"filename": relPath,
+								"type":     "doc",
+							},
+						},
+					},
+				)
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
+			}
 
 			if strings.TrimSpace(codeSummaryContent) == "" {
 				emptyFileResponses = append(
@@ -209,6 +235,7 @@ func main() {
 						PageContent: pkgSummaryContent,
 						Metadata: map[string]interface{}{
 							"package": pkg,
+							"type":    "doc",
 						},
 					},
 				},
