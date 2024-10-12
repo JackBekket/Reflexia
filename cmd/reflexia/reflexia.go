@@ -19,7 +19,6 @@ import (
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/schema"
 
-	"github.com/JackBekket/hellper/lib/embeddings"
 	util "github.com/JackBekket/reflexia/internal"
 	store "github.com/JackBekket/reflexia/pkg"
 	"github.com/JackBekket/reflexia/pkg/project"
@@ -78,7 +77,7 @@ func main() {
 	var embeddingsService *store.EmbeddingsService
 	if config.UseEmbeddings {
 		projectName := filepath.Base(projectConfig.RootPath)
-		vectorStore, err := embeddings.GetVectorStoreWithOptions(
+		vectorStore, err := store.NewVectorStoreWithPreDelete(
 			*config.EmbeddingsAIURL,
 			*config.EmbeddingsAIAPIKey,
 			*config.EmbeddingsDBURL,
@@ -87,6 +86,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		embeddingsService = &store.EmbeddingsService{
 			Store: vectorStore,
 		}
