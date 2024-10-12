@@ -283,7 +283,7 @@ func printEmptyWarning(message string, responses []string) {
 	}
 	fmt.Printf(message, len(responses))
 	for _, response := range responses {
-		fmt.Printf(" - %s\n", response)
+		log.Printf(" - %s\n", response)
 	}
 }
 
@@ -432,14 +432,13 @@ func processWorkingDirectory(githubLink, githubUsername, githubToken string) (st
 
 func initConfig() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
-		return nil, err
+		log.Println(err)
 	}
 
 	config := Config{}
 
 	config.GithubLink = flag.String("g", "", "valid link for github repository")
 	config.GithubUsername = flag.String("u", "", "github username for ssh auth")
-	config.ExactPackages = flag.String("p", "", "exact package names, ',' delimited")
 
 	githubToken := os.Getenv("GH_TOKEN")
 	config.GithubToken = &githubToken
@@ -467,6 +466,7 @@ func initConfig() (*Config, error) {
 	config.EmbeddingsDBURL = &embDBURL
 	flag.StringVar(config.EmbeddingsDBURL, "ed", *config.EmbeddingsDBURL, "Embeddings pgxpool DB connect URL")
 
+	config.ExactPackages = flag.String("p", "", "exact package names, ',' delimited")
 	config.LightCheck = false
 	config.WithFileSummary = false
 	config.OverwriteReadme = false
