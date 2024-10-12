@@ -33,6 +33,21 @@ type ProjectConfig struct {
 func GetProjectConfig(
 	currentDirectory, withConfigFile string, lightCheck bool,
 ) (*ProjectConfig, error) {
+	if _, err := os.Stat("project_config"); os.IsNotExist(err) {
+		if _, err := os.Stat(withConfigFile); err == nil {
+			content, err := os.ReadFile(withConfigFile)
+			if err != nil {
+				return nil, err
+			}
+			var config ProjectConfig
+			if err = toml.Unmarshal(content, &config); err != nil {
+				return nil, err
+			}
+			config.RootPath = currentDirectory
+			return &config, nil
+		}
+	}
+
 	var projectConfigs = map[string]ProjectConfig{}
 
 	if err := util.WalkDirIgnored(
