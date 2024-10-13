@@ -26,20 +26,21 @@ import (
 )
 
 type Config struct {
-	GithubLink         *string
-	GithubUsername     *string
-	GithubToken        *string
-	WithConfigFile     *string
-	ExactPackages      *string
-	LightCheck         bool
-	WithFileSummary    bool
-	UseEmbeddings      bool
-	OverwriteReadme    bool
-	OverwriteCache     bool
-	EmbeddingsAIURL    *string
-	EmbeddingsAIAPIKey *string
-	EmbeddingsDBURL    *string
-	CachePath          *string
+	GithubLink                    *string
+	GithubUsername                *string
+	GithubToken                   *string
+	WithConfigFile                *string
+	ExactPackages                 *string
+	LightCheck                    bool
+	WithFileSummary               bool
+	UseEmbeddings                 bool
+	OverwriteReadme               bool
+	OverwriteCache                bool
+	EmbeddingsAIURL               *string
+	EmbeddingsAIAPIKey            *string
+	EmbeddingsDBURL               *string
+	EmbeddingsSimSearchTestPrompt *string
+	CachePath                     *string
 }
 
 func main() {
@@ -275,6 +276,24 @@ func main() {
 	printEmptyWarning("[WARN] %d empty LLM responses for files\n", emptyFileResponses)
 	printEmptyWarning("[WARN] %d fallback attempts for packages\n", fallbackPackageResponses)
 	printEmptyWarning("[WARN] %d empty LLM responses for packages\n", emptyPackageResponses)
+
+	if embeddingsService != nil && config.EmbeddingsSimSearchTestPrompt != nil {
+		results, err := embeddingsService.Store.SimilaritySearch(context.Background(), *config.EmbeddingsSimSearchTestPrompt, 2)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(results) == 0 {
+			log.Fatalf("No similarity search results found for %s test prompt\n", *config.EmbeddingsSimSearchTestPrompt)
+		}
+		fmt.Printf("\n\nSimilarity search results for a test prompt \"%s\":\n", *config.EmbeddingsSimSearchTestPrompt)
+		for i, result := range results {
+			fmt.Printf("%d: score %f\n", i, result.Score)
+			for k, v := range result.Metadata {
+				fmt.Printf("    %s: %s\n", k, v)
+			}
+			fmt.Printf("\n%s\n\n", result.PageContent)
+		}
+	}
 }
 
 func printEmptyWarning(message string, responses []string) {
@@ -283,7 +302,7 @@ func printEmptyWarning(message string, responses []string) {
 	}
 	fmt.Printf(message, len(responses))
 	for _, response := range responses {
-		log.Printf(" - %s\n", response)
+		fmt.Printf(" - %s\n", response)
 	}
 }
 
@@ -324,7 +343,7 @@ func getDirFileStructure(workdir string) (string, error) {
 func fileMapToString(fileMap map[string]string) string {
 	content := ""
 	entries := []string{}
-	for file, _ := range fileMap {
+	for file := range fileMap {
 		entries = append(entries, file)
 	}
 	slices.Sort(entries)
@@ -337,7 +356,7 @@ func fileMapToString(fileMap map[string]string) string {
 func fileMapToMd(fileMap map[string]string) string {
 	content := ""
 	entries := []string{}
-	for file, _ := range fileMap {
+	for file := range fileMap {
 		entries = append(entries, file)
 	}
 	slices.Sort(entries)
@@ -465,6 +484,10 @@ func initConfig() (*Config, error) {
 	embDBURL := os.Getenv("EMBEDDINGS_DB_URL")
 	config.EmbeddingsDBURL = &embDBURL
 	flag.StringVar(config.EmbeddingsDBURL, "ed", *config.EmbeddingsDBURL, "Embeddings pgxpool DB connect URL")
+
+	embSimSearchTestPrompt := os.Getenv("EMBEDDINGS_SIM_SEARCH_TEST_PROMPT")
+	config.EmbeddingsSimSearchTestPrompt = &embSimSearchTestPrompt
+	flag.StringVar(config.EmbeddingsSimSearchTestPrompt, "et", *config.EmbeddingsSimSearchTestPrompt, "Embeddings similarity search validation test prompt")
 
 	config.ExactPackages = flag.String("p", "", "exact package names, ',' delimited")
 	config.LightCheck = false
