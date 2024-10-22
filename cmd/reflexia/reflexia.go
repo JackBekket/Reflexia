@@ -391,7 +391,10 @@ func writeFile(path, content string) error {
 }
 
 func processWorkingDirectory(githubLink, githubUsername, githubToken string) (string, error) {
-	workdir := loadEnv("PWD")
+	workdir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
 
 	if githubLink != "" {
 		u, err := url.ParseRequestURI(githubLink)
