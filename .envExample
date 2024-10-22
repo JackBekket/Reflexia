@@ -1,6 +1,9 @@
 HELPER_URL=http://example.com:8080
-API_TOKEN=""
-MODEL="tiger-gemma-9b-v1-i1"
-#MODEL="deepseek-coder-6b-instruct"
-#MODEL="wizard-uncensored-code-34b"
-STOP_WORD="<help_me_banana>"
+API_TOKEN=
+MODEL=tiger-gemma-9b-v1-i1
+#MODEL=deepseek-coder-6b-instruct
+#MODEL=wizard-uncensored-code-34b
+
+EMBEDDINGS_AI_URL=http://example.com:8080
+EMBEDDINGS_AI_KEY=
+EMBEDDINGS_DB_URL=postgresql://...
