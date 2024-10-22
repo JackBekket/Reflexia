@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	git "github.com/go-git/go-git/v5"
@@ -55,12 +56,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	projectConfig, err := project.GetProjectConfig(
+	projectConfigVariants, err := project.GetProjectConfig(
 		workdir, *config.WithConfigFile, config.LightCheck,
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	projectConfig, err := chooseProjectConfig(projectConfigVariants)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	summarizeService := &summarize.SummarizerService{
 		HelperURL: loadEnv("HELPER_URL"),
 		Model:     loadEnv("MODEL"),
@@ -72,6 +78,8 @@ func main() {
 			),
 			llms.WithRepetitionPenalty(0.7),
 		},
+		// Tests only
+		IgnoreCache:    false,
 		OverwriteCache: config.OverwriteCache,
 		CachePath:      *config.CachePath,
 	}
@@ -388,6 +396,45 @@ func writeFile(path, content string) error {
 		return err
 	}
 	return nil
+}
+
+func chooseProjectConfig(projectConfigVariants map[string]*project.ProjectConfig) (*project.ProjectConfig, error) {
+	switch len(projectConfigVariants) {
+	case 0:
+		return nil, errors.New(
+			"failed to detect project language, available languages: go, python, typescript",
+		)
+	case 1:
+		for _, pc := range projectConfigVariants {
+			return pc, nil
+		}
+	default:
+		var filenames []string
+		for filename := range projectConfigVariants {
+			filenames = append(filenames, filename)
+		}
+		fmt.Println("Multiple project config matches found!")
+		for i, filename := range filenames {
+			fmt.Printf("%d. %v\n", i+1, filename)
+		}
+		fmt.Print("Enter the number or filename: ")
+		for {
+			var input string
+			if _, err := fmt.Scanln(&input); err != nil {
+				log.Fatal(err)
+			}
+			if index, err := strconv.Atoi(input); err == nil && index > 0 && index <= len(filenames) {
+				return projectConfigVariants[filenames[index-1]], nil
+			} else {
+				for filename, config := range projectConfigVariants {
+					if filename == input || strings.TrimSuffix(filename, ".toml") == input {
+						return config, nil
+					}
+				}
+			}
+		}
+	}
+	panic("unreachable")
 }
 
 func processWorkingDirectory(githubLink, githubUsername, githubToken string) (string, error) {

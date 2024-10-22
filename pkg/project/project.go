@@ -2,7 +2,6 @@ package project
 
 import (
 	"errors"
-	"fmt"
 	"go/parser"
 	"go/token"
 	"io"
@@ -10,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	util "github.com/JackBekket/reflexia/internal"
@@ -32,7 +30,7 @@ type ProjectConfig struct {
 
 func GetProjectConfig(
 	currentDirectory, withConfigFile string, lightCheck bool,
-) (*ProjectConfig, error) {
+) (map[string]*ProjectConfig, error) {
 	if _, err := os.Stat("project_config"); os.IsNotExist(err) {
 		if _, err := os.Stat(withConfigFile); err == nil {
 			content, err := os.ReadFile(withConfigFile)
@@ -44,7 +42,7 @@ func GetProjectConfig(
 				return nil, err
 			}
 			config.RootPath = currentDirectory
-			return &config, nil
+			return map[string]*ProjectConfig{withConfigFile: &config}, nil
 		}
 	}
 
@@ -74,7 +72,7 @@ func GetProjectConfig(
 	}
 
 	if config, exists := projectConfigs[filepath.Base(withConfigFile)]; exists {
-		return &config, nil
+		return map[string]*ProjectConfig{withConfigFile: &config}, nil
 	}
 	var projectConfigVariants = map[string]*ProjectConfig{}
 	for filename, config := range projectConfigs {
@@ -86,43 +84,7 @@ func GetProjectConfig(
 			projectConfigVariants[filename] = &config
 		}
 	}
-
-	switch len(projectConfigVariants) {
-	case 0:
-		return nil, errors.New(
-			"failed to detect project language, available languages: go, python, typescript",
-		)
-	case 1:
-		for _, config := range projectConfigVariants {
-			return config, nil
-		}
-	default:
-		var filenames []string
-		for filename, _ := range projectConfigVariants {
-			filenames = append(filenames, filename)
-		}
-		fmt.Println("Multiple project config matches found!")
-		for i, filename := range filenames {
-			fmt.Printf("%d. %v\n", i+1, filename)
-		}
-		fmt.Print("Enter the number or filename: ")
-		for {
-			var input string
-			if _, err := fmt.Scanln(&input); err != nil {
-				return nil, err
-			}
-			if index, err := strconv.Atoi(input); err == nil && index > 0 && index <= len(filenames) {
-				return projectConfigVariants[filenames[index-1]], nil
-			} else {
-				for filename, config := range projectConfigVariants {
-					if filename == input || strings.TrimSuffix(filename, ".toml") == input {
-						return config, nil
-					}
-				}
-			}
-		}
-	}
-	panic("unreachable")
+	return projectConfigVariants, nil
 }
 
 func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {

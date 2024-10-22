@@ -20,6 +20,7 @@ type SummarizerService struct {
 	Network        string
 	LlmOptions     []llms.CallOption
 	OverwriteCache bool
+	IgnoreCache    bool
 	CachePath      string
 }
 
@@ -31,7 +32,7 @@ func (s *SummarizerService) LLMRequest(format string, a ...string) (string, erro
 	}
 	response := ""
 
-	if !s.OverwriteCache {
+	if !(s.OverwriteCache || s.IgnoreCache) {
 		response, err = loadCache(s.CachePath, cacheHash)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return "", err
@@ -44,8 +45,10 @@ func (s *SummarizerService) LLMRequest(format string, a ...string) (string, erro
 		); err != nil {
 			return "", err
 		}
-		if err = saveCache(s.CachePath, cacheHash, response); err != nil {
-			return "", err
+		if !s.IgnoreCache {
+			if err = saveCache(s.CachePath, cacheHash, response); err != nil {
+				return "", err
+			}
 		}
 	} else {
 		fmt.Printf("Using cached result:\n%s\n", response)
