@@ -173,7 +173,7 @@ func hasFilterFiles(workdir string, filters []string) bool {
 		err = nil
 	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("pkg/project/project.go: hasFilterFiles WalkDirIgnored fatal error: %v", err)
 	}
 	return found
 }

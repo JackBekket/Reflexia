@@ -13,7 +13,7 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
-type SummarizerService struct {
+type SummarizeService struct {
 	HelperURL      string
 	Model          string
 	ApiToken       string
@@ -24,7 +24,7 @@ type SummarizerService struct {
 	CachePath      string
 }
 
-func (s *SummarizerService) LLMRequest(format string, a ...string) (string, error) {
+func (s *SummarizeService) LLMRequest(format string, a ...string) (string, error) {
 	finalPrompt := fmt.Sprintf(format, a)
 	cacheHash, err := hashStrings(finalPrompt)
 	if err != nil {

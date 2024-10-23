@@ -5,12 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -18,10 +16,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/schema"
 
-	util "github.com/JackBekket/reflexia/internal"
 	store "github.com/JackBekket/reflexia/pkg"
+	packagerunner "github.com/JackBekket/reflexia/pkg/package_runner"
 	"github.com/JackBekket/reflexia/pkg/project"
 	"github.com/JackBekket/reflexia/pkg/summarize"
 )
@@ -47,27 +44,27 @@ type Config struct {
 func main() {
 	config, err := initConfig()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("initConfig() error: %v", err)
 	}
 
 	workdir, err := processWorkingDirectory(
 		*config.GithubLink, *config.GithubUsername, *config.GithubToken)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("processWorkingDirectory(...) error: %v", err)
 	}
 
 	projectConfigVariants, err := project.GetProjectConfig(
 		workdir, *config.WithConfigFile, config.LightCheck,
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("project.GetProjectConfig(...) error: %v", err)
 	}
 	projectConfig, err := chooseProjectConfig(projectConfigVariants)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("chooseProjectConfig(...) error: %v", err)
 	}
 
-	summarizeService := &summarize.SummarizerService{
+	summarizeService := &summarize.SummarizeService{
 		HelperURL: loadEnv("HELPER_URL"),
 		Model:     loadEnv("MODEL"),
 		ApiToken:  loadEnv("API_TOKEN"),
@@ -93,7 +90,7 @@ func main() {
 			projectName,
 		)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("store.NewVectorStoreWithPreDelete(...) error: %v", err)
 		}
 
 		embeddingsService = &store.EmbeddingsService{
@@ -104,180 +101,26 @@ func main() {
 
 	pkgFiles, err := projectConfig.BuildPackageFiles()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("projectConfig.BuildPackageFiles() error: %v", err)
 	}
 
-	fallbackFileResponses := []string{}
-	emptyFileResponses := []string{}
-	fallbackPackageResponses := []string{}
-	emptyPackageResponses := []string{}
+	packageRunnerService := packagerunner.PackageRunnerService{
+		PkgFiles:          pkgFiles,
+		ProjectConfig:     projectConfig,
+		SummarizeService:  summarizeService,
+		EmbeddingsService: embeddingsService,
+		ExactPackages:     config.ExactPackages,
+		OverwriteReadme:   config.OverwriteReadme,
+		WithFileSummary:   config.WithFileSummary,
+	}
 
-	for pkg, files := range pkgFiles {
-		if *config.ExactPackages != "" &&
-			!slices.Contains(strings.Split(*config.ExactPackages, ","), pkg) {
-			continue
-		}
-		fmt.Printf("\nPackage %s\n", pkg)
-
-		pkgFileMap := map[string]string{}
-		pkgDir := ""
-		for _, relPath := range files {
-			fmt.Println(relPath)
-			content, err := os.ReadFile(filepath.Join(projectConfig.RootPath, relPath))
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			contentStr := string(content)
-			codeSummaryContent := "Empty file"
-
-			if strings.TrimSpace(contentStr) != "" {
-				codeSummaryContent, err = summarizeService.LLMRequest(
-					"%s```%s```",
-					projectConfig.CodePrompt, contentStr,
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				if strings.TrimSpace(codeSummaryContent) == "" &&
-					projectConfig.CodePromptFallback != nil {
-					fallbackFileResponses = append(
-						fallbackFileResponses,
-						filepath.Join(projectConfig.RootPath, relPath),
-					)
-					codeSummaryContent, err = summarizeService.LLMRequest(
-						"%s```%s```",
-						*projectConfig.CodePromptFallback, contentStr,
-					)
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
-			} else {
-				fmt.Println("Empty file")
-			}
-
-			fmt.Printf("\n")
-			pkgFileMap[relPath] = codeSummaryContent
-			if embeddingsService != nil {
-				ids, err := embeddingsService.Store.AddDocuments(
-					context.Background(),
-					[]schema.Document{
-						{
-							PageContent: string(content),
-							Metadata: map[string]interface{}{
-								"package":  pkg,
-								"filename": relPath,
-								"type":     "code",
-							},
-						}, {
-							PageContent: codeSummaryContent,
-							Metadata: map[string]interface{}{
-								"package":  pkg,
-								"filename": relPath,
-								"type":     "doc",
-							},
-						},
-					},
-				)
-				if err != nil {
-					log.Fatal(err)
-				}
-				fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
-			}
-
-			if strings.TrimSpace(codeSummaryContent) == "" {
-				emptyFileResponses = append(
-					emptyFileResponses,
-					filepath.Join(projectConfig.RootPath, relPath),
-				)
-			}
-			if pkgDir == "" {
-				pkgDir = filepath.Join(projectConfig.RootPath, filepath.Dir(relPath))
-			}
-		}
-		if pkgDir == "" {
-			log.Println("There is no mathcing files for pkg: ", pkg)
-			continue
-		}
-
-		fileStructure, err := getDirFileStructure(pkgDir)
-		if err != nil {
-			log.Print(err)
-		}
-
-		fmt.Printf("\nSummary for a package %s: \n", pkg)
-		// Generate Summary for a package (summarizing and group file summarization by package name)
-		// Get whole map of code summaries as a string and toss it to summarize .MD for a package
-		pkgSummaryContent, err := summarizeService.LLMRequest(
-			"%s\n\n%s\n%s",
-			projectConfig.PackagePrompt,
-			fileStructure,
-			fileMapToString(pkgFileMap),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if strings.TrimSpace(pkgSummaryContent) == "" && projectConfig.PackagePromptFallback != nil {
-			fallbackPackageResponses = append(fallbackPackageResponses, pkg)
-			pkgSummaryContent, err = summarizeService.LLMRequest(
-				"%s\n\n%s\n%s",
-				*projectConfig.PackagePromptFallback,
-				fileStructure,
-				fileMapToString(pkgFileMap),
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		if strings.TrimSpace(pkgSummaryContent) == "" {
-			emptyPackageResponses = append(emptyPackageResponses, pkg)
-		}
-
-		if embeddingsService != nil {
-			ids, err := embeddingsService.Store.AddDocuments(
-				context.Background(),
-				[]schema.Document{
-					{
-						PageContent: pkgSummaryContent,
-						Metadata: map[string]interface{}{
-							"package": pkg,
-							"type":    "doc",
-						},
-					},
-				},
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
-		}
-
-		readmeFilename := "README.md"
-		if !config.OverwriteReadme {
-			readmeFilename, err = getReadmePath(pkgDir)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-		if err := writeFile(
-			filepath.Join(pkgDir, readmeFilename),
-			pkgSummaryContent,
-		); err != nil {
-			log.Fatal(err)
-		}
-
-		if config.WithFileSummary {
-			if err := writeFile(
-				filepath.Join(pkgDir, "FILES.md"),
-				fileMapToMd(pkgFileMap),
-			); err != nil {
-				log.Fatal(err)
-			}
-		}
-
+	fallbackFileResponses,
+		emptyFileResponses,
+		fallbackPackageResponses,
+		emptyPackageResponses,
+		err := packageRunnerService.RunPackages()
+	if err != nil {
+		log.Fatalf("packageRunnerService.RunPackages() error: %v", err)
 	}
 
 	printEmptyWarning("[WARN] %d fallback attempts for files\n", fallbackFileResponses)
@@ -288,7 +131,7 @@ func main() {
 	if embeddingsService != nil && config.EmbeddingsSimSearchTestPrompt != nil {
 		results, err := embeddingsService.Store.SimilaritySearch(context.Background(), *config.EmbeddingsSimSearchTestPrompt, 2)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("embeddingsService.Store.SimilaritySearch() error: %v", err)
 		}
 		if len(results) == 0 {
 			log.Fatalf("No similarity search results found for %s test prompt\n", *config.EmbeddingsSimSearchTestPrompt)
@@ -322,82 +165,6 @@ func loadEnv(key string) string {
 	return value
 }
 
-func getDirFileStructure(workdir string) (string, error) {
-	content := fmt.Sprintf("%s directory file structure:\n", filepath.Base(workdir))
-	entries := []string{}
-	if err := util.WalkDirIgnored(workdir, "", func(path string, d fs.DirEntry) error {
-		if d.IsDir() {
-			return nil
-		}
-		relPath, err := filepath.Rel(workdir, path)
-		if err != nil {
-			return err
-		}
-		if strings.HasSuffix(path, ".md") {
-			return nil
-		}
-		entries = append(entries, relPath)
-		return nil
-	}); err != nil {
-		return "", err
-	}
-	slices.Sort(entries)
-	for _, entry := range entries {
-		content += "- " + entry + "\n"
-	}
-	return content, nil
-}
-
-func fileMapToString(fileMap map[string]string) string {
-	content := ""
-	entries := []string{}
-	for file := range fileMap {
-		entries = append(entries, file)
-	}
-	slices.Sort(entries)
-	for _, file := range entries {
-		content += file + "\n" + fileMap[file] + "\n\n"
-	}
-	return content
-}
-
-func fileMapToMd(fileMap map[string]string) string {
-	content := ""
-	entries := []string{}
-	for file := range fileMap {
-		entries = append(entries, file)
-	}
-	slices.Sort(entries)
-	for _, file := range entries {
-		content += "# " + file + "\n" + fileMap[file] + "\n\n"
-	}
-	return strings.ReplaceAll(content, "\n", "  \n")
-}
-
-func getReadmePath(workdir string) (string, error) {
-	readmeFilename := "README_GENERATED.md"
-	if _, err := os.Stat(filepath.Join(workdir, "README.md")); err != nil {
-		if os.IsNotExist(err) {
-			readmeFilename = "README.md"
-		} else {
-			return "", err
-		}
-	}
-	return readmeFilename, nil
-}
-
-func writeFile(path, content string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	if _, err = file.WriteString(content); err != nil {
-		return err
-	}
-	return nil
-}
-
 func chooseProjectConfig(projectConfigVariants map[string]*project.ProjectConfig) (*project.ProjectConfig, error) {
 	switch len(projectConfigVariants) {
 	case 0:
@@ -421,7 +188,7 @@ func chooseProjectConfig(projectConfigVariants map[string]*project.ProjectConfig
 		for {
 			var input string
 			if _, err := fmt.Scanln(&input); err != nil {
-				log.Fatal(err)
+				log.Fatalf("fmt.Scanln(...) error: %v", err)
 			}
 			if index, err := strconv.Atoi(input); err == nil && index > 0 && index <= len(filenames) {
 				return projectConfigVariants[filenames[index-1]], nil

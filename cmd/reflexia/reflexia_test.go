@@ -132,7 +132,7 @@ func TestLLMResponse(t *testing.T) {
 		}
 	}
 
-	summarizeService := &summarize.SummarizerService{
+	summarizeService := &summarize.SummarizeService{
 		HelperURL: helper_url,
 		Model:     model,
 		ApiToken:  apiToken,

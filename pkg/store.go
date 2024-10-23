@@ -36,12 +36,12 @@ func NewVectorStoreWithPreDelete(ai_url string, api_token string, db_link string
 		openai.WithToken(api_token),
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("pkg/store.go: openai.New fatal error: %v", err)
 	}
 
 	e, err := embeddings.NewEmbedder(llm)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("pkg/store.go: embeddings.NewEmbedder fatal error: %v", err)
 	}
 	if err != nil {
 		return nil, err
