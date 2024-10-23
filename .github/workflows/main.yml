@@ -1,0 +1,17 @@
+name: Go
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.x'
+      - name: Build
+        run: go build -v cmd/reflexia/reflexia.go
+      - name: Test with the Go CLI
+        run: go test -v cmd/reflexia/*.go
