@@ -31,3 +31,16 @@ It is mandatory to prepend the <end_of_output> at the very end of your output.
 
 Provided code:
 """
+
+package_prompt_fallback = """
+Based on provided input from the summary of project package files create a markdown summary of what that package code does.
+First write a short summary about provided files code summary.
+Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
+Always list and specify the edgecases of how application can be launched if it is cmd/cli/main package.
+Try to guess package name from the file contents or file paths and add it as the markdown header of the summary.
+Write out all file names as a project package structure.
+Try to explain relations between code entities, try to find unclear places, possibly dead code.		
+If unclear places or dead code are not present - don't write anything about their absense.
+Try to be clear, concise, and brief.
+The main goal is to summarize the logic of the whole package.
+"""
