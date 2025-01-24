@@ -62,7 +62,7 @@ func TestGetProjectConfig(t *testing.T) {
 		"Project language .toml config",
 		func(t *testing.T) {
 			projectConfigVariants, err := project.GetProjectConfig(
-				"temp/JackBekket/GitHelper", "", false,
+				"temp/root_branch/JackBekket/GitHelper", "", false,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -85,7 +85,7 @@ func TestBuildPackageFiles(t *testing.T) {
 		"Project package files",
 		func(t *testing.T) {
 			projectConfigVariants, err := project.GetProjectConfig(
-				"temp/JackBekket/GitHelper", "", false,
+				"temp/root_branch/JackBekket/GitHelper", "", false,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -119,7 +119,7 @@ func TestLLMResponse(t *testing.T) {
 	helper_url, model, apiToken := checkLoadLLMConfig(t)
 
 	projectConfigVariants, err := project.GetProjectConfig(
-		"temp/JackBekket/GitHelper", "", false,
+		"temp/root_branch/JackBekket/GitHelper", "", false,
 	)
 	if err != nil {
 		t.Fatal(err)
