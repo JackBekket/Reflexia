@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
@@ -25,6 +26,7 @@ import (
 
 type Config struct {
 	GithubLink                    *string
+	GithubBranch                  *string
 	GithubUsername                *string
 	GithubToken                   *string
 	WithConfigFile                *string
@@ -48,7 +50,7 @@ func main() {
 	}
 
 	workdir, err := processWorkingDirectory(
-		*config.GithubLink, *config.GithubUsername, *config.GithubToken)
+		*config.GithubLink, *config.GithubBranch, *config.GithubUsername, *config.GithubToken)
 	if err != nil {
 		log.Fatalf("processWorkingDirectory(...) error: %v", err)
 	}
@@ -204,7 +206,7 @@ func chooseProjectConfig(projectConfigVariants map[string]*project.ProjectConfig
 	panic("unreachable")
 }
 
-func processWorkingDirectory(githubLink, githubUsername, githubToken string) (string, error) {
+func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubToken string) (string, error) {
 	workdir, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -222,7 +224,14 @@ func processWorkingDirectory(githubLink, githubUsername, githubToken string) (st
 		}
 
 		tempDirEl := []string{workdir, "temp"}
-		tempDirEl = append(tempDirEl, sPath...)
+		if githubBranch != "" {
+			tempDirEl = append(tempDirEl, "with_branch")
+			tempDirEl = append(tempDirEl, sPath...)
+			tempDirEl = append(tempDirEl, githubBranch)
+		} else {
+			tempDirEl = append(tempDirEl, "root_branch")
+			tempDirEl = append(tempDirEl, sPath...)
+		}
 		tempDir := filepath.Join(tempDirEl...)
 
 		workdir = tempDir
@@ -237,6 +246,10 @@ func processWorkingDirectory(githubLink, githubUsername, githubToken string) (st
 					URL:               githubLink,
 					RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 					Depth:             1,
+				}
+				if githubBranch != "" {
+					cloneOptions.ReferenceName = plumbing.ReferenceName(githubBranch)
+					cloneOptions.SingleBranch = true
 				}
 				if githubUsername != "" && githubToken != "" {
 					cloneOptions.Auth = &http.BasicAuth{
@@ -274,6 +287,7 @@ func initConfig() (*Config, error) {
 	config := Config{}
 
 	config.GithubLink = flag.String("g", "", "valid link for github repository")
+	config.GithubBranch = flag.String("b", "", "optional branch for github repository")
 	config.GithubUsername = flag.String("u", "", "github username for ssh auth")
 
 	githubToken := os.Getenv("GH_TOKEN")

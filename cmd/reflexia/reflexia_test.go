@@ -22,7 +22,7 @@ func TestProcessWorkingDirectory(t *testing.T) {
 	t.Run(
 		"Working directory without links",
 		func(t *testing.T) {
-			workdir, err := processWorkingDirectory("", "", "")
+			workdir, err := processWorkingDirectory("", "", "", "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -34,7 +34,7 @@ func TestProcessWorkingDirectory(t *testing.T) {
 	t.Run(
 		"Working directory with github link",
 		func(t *testing.T) {
-			workdir, err := processWorkingDirectory("https://github.com/JackBekket/GitHelper", "", "")
+			workdir, err := processWorkingDirectory("https://github.com/JackBekket/GitHelper", "", "", "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +46,7 @@ func TestProcessWorkingDirectory(t *testing.T) {
 	t.Run(
 		"Working directory with github link using cached temp result",
 		func(t *testing.T) {
-			workdir, err := processWorkingDirectory("https://github.com/JackBekket/GitHelper", "", "")
+			workdir, err := processWorkingDirectory("https://github.com/JackBekket/GitHelper", "", "", "")
 			if err != nil {
 				t.Fatal(err)
 			}
