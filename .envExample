@@ -1,8 +1,9 @@
-AI_URL=http://0.0.0.0/lai/federated/v1/
-HELPER_URL=http://0.0.0.0/lai/federated/v1/
+AI_URL=http://0.0.0.0/lai/weights
+HELPER_URL=http://0.0.0.0/lai/weights
 API_TOKEN="xxx"
 MODEL="tiger-gemma-9b-v1-i1"  #big-tiger-gemma-27b-v1 
 #MODEL="big-tiger-gemma-27b-v1"
+MODEL="meta-llama-3.1-8b-instruct-abliterated"
 EMBEDDINGS_AI_KEY="whosyourdaddy"
-EMBEDDINGS_AI_URL=http://0.0.0.0/lai/federated/v1/
+EMBEDDINGS_AI_URL=http://0.0.0.0/lai/federated
 EMBEDDINGS_DB_URL=postgresql://...

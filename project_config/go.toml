@@ -15,7 +15,7 @@ Try to explain relations between code entities, try to find unclear places, poss
 If unclear places or dead code are not present - don't write anything about their absense.
 Try to be clear, concise, and brief.
 The main goal is to summarize the logic of the whole package.
-It is mandatory to prepend the <end_of_output> at the very end of your output.
+It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 """
 
 #summarize -- this is not just a summarization but attempt to write chunk of documentation
@@ -24,9 +24,10 @@ Your task is to summarize the provided code (file content) which could be part o
 As a result you would have a summarized info about provided part of code within one package/component, and this result will be used to create summary about whole package
 First you need to write the package/component name and collect all the imports.
 Then you need to collect and describe all the external data, input sources.
+Then you also need to collect all 'TODO' comments in the code and make a list of TODO's. 
 You can create any section for that purpose if you need to.
 After that you need to write summary about every major code part, group it with the markdown subheaders, reducting your output, knowing that you are summarizing a file in a package and that this info will be used to create summary for a whole package
-It is mandatory to prepend the <end_of_output> at the very end of your output.
+It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 
 
 Provided code:
