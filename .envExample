@@ -1,9 +1,8 @@
-HELPER_URL=http://example.com:8080
-API_TOKEN=
-MODEL=tiger-gemma-9b-v1-i1
-#MODEL=deepseek-coder-6b-instruct
-#MODEL=wizard-uncensored-code-34b
-
-EMBEDDINGS_AI_URL=http://example.com:8080
-EMBEDDINGS_AI_KEY=
+AI_URL=http://0.0.0.0/lai/federated/v1/
+HELPER_URL=http://0.0.0.0/lai/federated/v1/
+API_TOKEN="xxx"
+MODEL="tiger-gemma-9b-v1-i1"  #big-tiger-gemma-27b-v1 
+#MODEL="big-tiger-gemma-27b-v1"
+EMBEDDINGS_AI_KEY="whosyourdaddy"
+EMBEDDINGS_AI_URL=http://0.0.0.0/lai/federated/v1/
 EMBEDDINGS_DB_URL=postgresql://...
