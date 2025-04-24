@@ -14,11 +14,6 @@ import (
 )
 
 func TestProcessWorkingDirectory(t *testing.T) {
-	// since test is running in cmd/reflexia folder we need to go back
-	err := os.Chdir("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
 	t.Run(
 		"Working directory without links",
 		func(t *testing.T) {
@@ -55,6 +50,27 @@ func TestProcessWorkingDirectory(t *testing.T) {
 			}
 		},
 	)
+}
+
+func TestProcessWorkingDirectoryIgnore(t *testing.T) {
+	t.Run(
+		"Working directory with github link",
+		func(t *testing.T) {
+			workdir, err := processWorkingDirectory("https://github.com/JackBekket/LocalAI", "", "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if filepath.Base(workdir) != "LocalAI" {
+				t.Fatalf("workdir != LocalAI")
+			}
+		},
+	)
+
+}
+
+func TestMainApp(t *testing.T) {
+	os.Args = []string{"", "-g", "https://github.com/JackBekket/LocalAI"}
+	main()
 }
 
 func TestGetProjectConfig(t *testing.T) {

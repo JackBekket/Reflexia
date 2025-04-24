@@ -244,12 +244,13 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 
 				cloneOptions := git.CloneOptions{
 					URL:               githubLink,
-					RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 					Depth:             1,
+					SingleBranch:      true,
+					RecurseSubmodules: git.NoRecurseSubmodules,
+					ShallowSubmodules: true,
 				}
 				if githubBranch != "" {
 					cloneOptions.ReferenceName = plumbing.ReferenceName(githubBranch)
-					cloneOptions.SingleBranch = true
 				}
 				if githubUsername != "" && githubToken != "" {
 					cloneOptions.Auth = &http.BasicAuth{
