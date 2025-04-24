@@ -44,10 +44,21 @@ type Config struct {
 }
 
 func main() {
+
+	
 	config, err := initConfig()
 	if err != nil {
 		log.Fatalf("initConfig() error: %v", err)
 	}
+
+	//g := *config.GithubLink
+	//flag.StringVar(&g, "link", "", "")
+	//TODO: this is for test only, remove when done
+	flag.Parse()
+    for _, v := range os.Args {
+        fmt.Println(v)
+    }
+	*config.GithubLink = os.Args[1]
 
 	workdir, err := processWorkingDirectory(
 		*config.GithubLink, *config.GithubBranch, *config.GithubUsername, *config.GithubToken)
@@ -258,7 +269,7 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 					}
 				}
 
-				if _, err := git.PlainClone(workdir, false, &cloneOptions); err != nil {
+				if _, err := git.PlainClone(workdir, false, &cloneOptions); err != nil {	//TODO: this is where error is 
 					if err := os.RemoveAll(workdir); err != nil {
 						return "", err
 					}
