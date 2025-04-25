@@ -1,5 +1,5 @@
-file_filter = [".cpp",".h",".hpp",".c",".cu",".cuh","CMakeLists.txt"]
-project_root_filter = ["go.mod", "src/go.mod"]
+file_filter = [".cpp",".h",".hpp",".c",".cu",".cuh"]
+project_root_filter = ["CMakeLists.txt"]
 module_match = "package_name"
 stop_words = ["<end_of_output>"]
 
