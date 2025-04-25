@@ -13,8 +13,10 @@ import (
 	"strings"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
 
@@ -219,19 +221,72 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 		}
 
 		sPath := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
-		if len(sPath) != 2 {
-			return "", errors.New("github repository url does not have two path elements")
+		cdAfter := ""
+		if len(sPath) < 2 {
+			return "", errors.New("github repository url does not have at least two path elements")
+		} else if len(sPath) > 2 {
+			// set githubLink to a repository only
+			u.Path = strings.Join(sPath[:2], "/")
+			githubLink = u.String()
+
+			if sPath[2] != "tree" {
+				return "", errors.New("extended github repository url should have 'tree' route after repository name")
+			}
+			if len(sPath) < 4 {
+				return "", errors.New("extended github repository url should have branch name after tree route")
+			}
+			// do not override branch set from the flag
+			if githubBranch == "" {
+				githubBranch = sPath[3]
+			}
+			cdAfter = strings.Join(sPath[4:], "/")
 		}
 
 		tempDirEl := []string{workdir, "temp"}
+		tempDirEl = append(tempDirEl, sPath[:2]...)
+
 		if githubBranch != "" {
-			tempDirEl = append(tempDirEl, "with_branch")
-			tempDirEl = append(tempDirEl, sPath...)
 			tempDirEl = append(tempDirEl, githubBranch)
 		} else {
-			tempDirEl = append(tempDirEl, "root_branch")
-			tempDirEl = append(tempDirEl, sPath...)
+			rem := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+				Name: "origin",
+				URLs: []string{githubLink},
+			})
+			refs, err := rem.List(&git.ListOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			var defaultBranchRef *plumbing.Reference
+			for _, ref := range refs {
+				if ref.Name() == "HEAD" {
+					defaultBranchRef = ref
+					break
+				}
+			}
+
+			if defaultBranchRef == nil {
+				return "", fmt.Errorf("HEAD reference not found in ls-remote output")
+			}
+
+			if defaultBranchRef.Type() == plumbing.SymbolicReference {
+				targetRefName := defaultBranchRef.Target()
+				for _, ref := range refs {
+					if ref.Name() == targetRefName {
+						defaultBranchRef = ref
+						break
+					}
+				}
+			}
+
+			tempDirEl = append(tempDirEl,
+				strings.Replace(
+					defaultBranchRef.Name().String(),
+					"refs/heads/",
+					"", 1),
+			)
 		}
+
 		tempDir := filepath.Join(tempDirEl...)
 
 		workdir = tempDir
@@ -270,6 +325,8 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 				return "", err
 			}
 		}
+		workdir = filepath.Join(workdir, cdAfter)
+
 	} else if len(flag.Args()) > 0 {
 		workdir = flag.Arg(0)
 		if _, err := os.Stat(workdir); err != nil {
