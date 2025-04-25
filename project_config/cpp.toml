@@ -1,0 +1,47 @@
+file_filter = [".cpp",".h",".hpp",".c",".cu",".cuh","CMakeLists.txt"]
+project_root_filter = ["go.mod", "src/go.mod"]
+module_match = "package_name"
+stop_words = ["<end_of_output>"]
+
+# this prompt takes all content generated to files and maka a summary for a package, therefore group code generatation output by package name. It is second call from main loop
+package_prompt = """
+Based on provided input from the summary of project package files create a markdown summary of what that package code does.
+First write a short summary about provided files code summary.
+Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
+Always list and specify the edgecases of how application can be launched if it is cmd/cli/main package.
+Try to guess package name from the file contents or file paths and add it as the markdown header of the summary.
+Write out all file names as a project package structure.
+Try to explain relations between code entities, try to find unclear places, possibly dead code.		
+If unclear places or dead code are not present - don't write anything about their absense.
+Try to be clear, concise, and brief.
+The main goal is to summarize the logic of the whole package.
+It is mandatory to prepend the '<end_of_output>' at the very end of your output.
+"""
+
+#summarize -- this is not just a summarization but attempt to write chunk of documentation
+code_prompt = """
+Your task is to summarize the provided code (file content) which could be part of a package or other component.
+As a result you would have a summarized info about provided part of code within one package/component, and this result will be used to create summary about whole package
+First you need to write the package/component name and collect all the imports.
+Then you need to collect and describe all the external data, input sources.
+Then you also need to collect all 'TODO' comments in the code and make a list of TODO's. 
+You can create any section for that purpose if you need to.
+After that you need to write summary about every major code part, group it with the markdown subheaders, reducting your output, knowing that you are summarizing a file in a package and that this info will be used to create summary for a whole package
+It is mandatory to prepend the '<end_of_output>' at the very end of your output.
+
+
+Provided code:
+"""
+
+package_prompt_fallback = """
+Based on provided input from the summary of project package files create a markdown summary of what that package code does.
+First write a short summary about provided files code summary.
+Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
+Always list and specify the edgecases of how application can be launched if it is cmd/cli/main package.
+Try to guess package name from the file contents or file paths and add it as the markdown header of the summary.
+Write out all file names as a project package structure.
+Try to explain relations between code entities, try to find unclear places, possibly dead code.		
+If unclear places or dead code are not present - don't write anything about their absense.
+Try to be clear, concise, and brief.
+The main goal is to summarize the logic of the whole package.
+"""
