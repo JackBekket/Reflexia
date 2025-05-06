@@ -1,16 +1,18 @@
 package main
 
 import (
-	"net/http"
-	"os"
-	"path/filepath"
+	"context"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/JackBekket/reflexia/pkg/project"
 	"github.com/JackBekket/reflexia/pkg/summarize"
-	"github.com/joho/godotenv"
+	"github.com/Swarmind/libagent/pkg/agent/generic"
+	"github.com/Swarmind/libagent/pkg/config"
+	"github.com/Swarmind/libagent/pkg/tools"
+	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/openai"
 )
 
 func TestProcessWorkingDirectory(t *testing.T) {
@@ -21,8 +23,8 @@ func TestProcessWorkingDirectory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if filepath.Base(workdir) != "Reflexia" {
-				t.Fatalf("workdir != reflexia")
+			if !strings.Contains(workdir, "Reflexia") {
+				t.Fatalf("workdir %s is not Reflexia", workdir)
 			}
 		},
 	)
@@ -33,8 +35,8 @@ func TestProcessWorkingDirectory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if filepath.Base(workdir) != "GitHelper" {
-				t.Fatalf("workdir != GitHelper")
+			if !strings.Contains(workdir, "GitHelper") {
+				t.Fatalf("workdir %s is not GitHelper", workdir)
 			}
 		},
 	)
@@ -45,8 +47,8 @@ func TestProcessWorkingDirectory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if filepath.Base(workdir) != "GitHelper" {
-				t.Fatalf("workdir != GitHelper")
+			if !strings.Contains(workdir, "GitHelper") {
+				t.Fatalf("workdir %s is not GitHelper", workdir)
 			}
 		},
 	)
@@ -60,17 +62,12 @@ func TestProcessWorkingDirectoryIgnore(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if filepath.Base(workdir) != "LocalAI" {
-				t.Fatalf("workdir != LocalAI")
+			if !strings.Contains(workdir, "LocalAI") {
+				t.Fatalf("workdir %s is not LocalAI", workdir)
 			}
 		},
 	)
 
-}
-
-func TestMainApp(t *testing.T) {
-	os.Args = []string{"", "-g", "https://github.com/JackBekket/LocalAI"}
-	main()
 }
 
 func TestGetProjectConfig(t *testing.T) {
@@ -78,7 +75,7 @@ func TestGetProjectConfig(t *testing.T) {
 		"Project language .toml config",
 		func(t *testing.T) {
 			projectConfigVariants, err := project.GetProjectConfig(
-				"temp/root_branch/JackBekket/GitHelper", "", false,
+				"temp/JackBekket/GitHelper/master", "", false,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -101,7 +98,7 @@ func TestBuildPackageFiles(t *testing.T) {
 		"Project package files",
 		func(t *testing.T) {
 			projectConfigVariants, err := project.GetProjectConfig(
-				"temp/root_branch/JackBekket/GitHelper", "", false,
+				"temp/JackBekket/GitHelper/master", "", false,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -132,10 +129,8 @@ func TestBuildPackageFiles(t *testing.T) {
 }
 
 func TestLLMResponse(t *testing.T) {
-	helper_url, model, apiToken := checkLoadLLMConfig(t)
-
 	projectConfigVariants, err := project.GetProjectConfig(
-		"temp/root_branch/JackBekket/GitHelper", "", false,
+		"temp/JackBekket/GitHelper/master", "", false,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -148,11 +143,48 @@ func TestLLMResponse(t *testing.T) {
 		}
 	}
 
+	agentCfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("config.NewConfig")
+	}
+	if agentCfg.AIURL == "" {
+		log.Fatal().Err(err).Msg("empty AI URL")
+	}
+	if agentCfg.AIToken == "" {
+		log.Fatal().Err(err).Msg("empty AI Token")
+	}
+	if agentCfg.Model == "" {
+		log.Fatal().Err(err).Msg("empty model")
+	}
+	agentCfg.DDGSearchDisable = true
+	agentCfg.SemanticSearchDisable = true
+	agentCfg.NmapDisable = true
+	agentCfg.SimpleCMDExecutorDisable = true
+	agentCfg.WebReaderDisable = true
+	agentCfg.ReWOODisable = true
+
+	ctx := context.Background()
+	agent := generic.Agent{}
+
+	llm, err := openai.New(
+		openai.WithBaseURL(agentCfg.AIURL),
+		openai.WithToken(agentCfg.AIToken),
+		openai.WithModel(agentCfg.Model),
+		openai.WithAPIVersion("v1"),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("openai.New")
+	}
+	agent.LLM = llm
+
+	toolsExecutor, err := tools.NewToolsExecutor(ctx, agentCfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("tools.NewToolsExecutor")
+	}
+	agent.ToolsExecutor = toolsExecutor
+
 	summarizeService := &summarize.SummarizeService{
-		HelperURL: helper_url,
-		Model:     model,
-		ApiToken:  apiToken,
-		Network:   "local",
+		Agent: agent,
 		LlmOptions: []llms.CallOption{
 			llms.WithStopWords(
 				projectConfig.StopWords,
@@ -174,31 +206,4 @@ func TestLLMResponse(t *testing.T) {
 			}
 		},
 	)
-}
-
-func checkLoadLLMConfig(t *testing.T) (string, string, string) {
-	if err := godotenv.Load(); err != nil {
-		t.Skip("Failed to load .env file. LLM tests will be skipped")
-	}
-	helper_url := os.Getenv("HELPER_URL")
-	if helper_url == "" {
-		t.Skip("No HELPER_URL environment variable found. LLM tests will be skipped")
-	}
-	timeout := time.Duration(10 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-	_, err := client.Get(helper_url)
-	if err != nil {
-		t.Skip("HELPER_URL is unavailable. LLM tests will be skipped")
-	}
-	model := os.Getenv("MODEL")
-	if model == "" {
-		t.Skip("No MODEL environment variable found. LLM tests will be skipped")
-	}
-	apiToken := os.Getenv("API_TOKEN")
-	if apiToken == "" {
-		t.Skip("No API_TOKEN environment variable found. LLM tests will be skipped")
-	}
-	return helper_url, model, apiToken
 }

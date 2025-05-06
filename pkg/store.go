@@ -2,9 +2,9 @@ package store
 
 import (
 	"context"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/vectorstores"
@@ -36,12 +36,12 @@ func NewVectorStoreWithPreDelete(ai_url string, api_token string, db_link string
 		openai.WithToken(api_token),
 	)
 	if err != nil {
-		log.Fatalf("pkg/store.go: openai.New fatal error: %v", err)
+		log.Fatal().Err(err).Msg("pkg/store.go:32")
 	}
 
 	e, err := embeddings.NewEmbedder(llm)
 	if err != nil {
-		log.Fatalf("pkg/store.go: embeddings.NewEmbedder fatal error: %v", err)
+		log.Fatal().Err(err).Msg("pkg/store.go:42")
 	}
 	if err != nil {
 		return nil, err

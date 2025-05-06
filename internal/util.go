@@ -3,11 +3,11 @@ package util
 import (
 	"errors"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 
 	ignore "github.com/crackcomm/go-gitignore"
+	"github.com/rs/zerolog/log"
 )
 
 type WalkDirIgnoredFunction func(path string, d fs.DirEntry) error
@@ -18,7 +18,7 @@ func WalkDirIgnored(workdir, gitignorePath string, f WalkDirIgnoredFunction) err
 	if gitignorePath != "" {
 		ignoreFile, err = ignore.CompileIgnoreFile(gitignorePath)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Printf("failed to load .gitignore file %v", err)
+			log.Warn().Err(err).Msg("failed to load .gitignore file")
 		}
 	}
 	err = filepath.WalkDir(workdir, func(path string, d fs.DirEntry, err error) error {

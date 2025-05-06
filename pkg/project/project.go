@@ -6,12 +6,12 @@ import (
 	"go/token"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	util "github.com/JackBekket/reflexia/internal"
+	"github.com/rs/zerolog/log"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -173,7 +173,7 @@ func hasFilterFiles(workdir string, filters []string) bool {
 		err = nil
 	}
 	if err != nil {
-		log.Fatalf("pkg/project/project.go: hasFilterFiles WalkDirIgnored fatal error: %v", err)
+		log.Fatal().Err(err).Msg("pkg/project/project.go:161")
 	}
 	return found
 }

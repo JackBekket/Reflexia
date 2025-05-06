@@ -5,20 +5,25 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/Swarmind/libagent/pkg/agent/generic"
+	"github.com/Swarmind/libagent/pkg/config"
+	"github.com/Swarmind/libagent/pkg/tools"
 	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
+	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/openai"
 
 	store "github.com/JackBekket/reflexia/pkg"
 	packagerunner "github.com/JackBekket/reflexia/pkg/package_runner"
@@ -46,33 +51,73 @@ type Config struct {
 }
 
 func main() {
-	config, err := initConfig()
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	cfg, err := initConfig()
 	if err != nil {
-		log.Fatalf("initConfig() error: %v", err)
+		log.Fatal().Err(err).Msg("init config")
 	}
 
 	workdir, err := processWorkingDirectory(
-		*config.GithubLink, *config.GithubBranch, *config.GithubUsername, *config.GithubToken)
+		*cfg.GithubLink, *cfg.GithubBranch, *cfg.GithubUsername, *cfg.GithubToken)
 	if err != nil {
-		log.Fatalf("processWorkingDirectory(...) error: %v", err)
+		log.Fatal().Err(err).Msg("process working directory")
 	}
 
 	projectConfigVariants, err := project.GetProjectConfig(
-		workdir, *config.WithConfigFile, config.LightCheck,
+		workdir, *cfg.WithConfigFile, cfg.LightCheck,
 	)
 	if err != nil {
-		log.Fatalf("project.GetProjectConfig(...) error: %v", err)
+		log.Fatal().Err(err).Msg("get project config")
 	}
 	projectConfig, err := chooseProjectConfig(projectConfigVariants)
 	if err != nil {
-		log.Fatalf("chooseProjectConfig(...) error: %v", err)
+		log.Fatal().Err(err).Msg("choose project config")
 	}
 
+	agentCfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("config.NewConfig")
+	}
+	if agentCfg.AIURL == "" {
+		log.Fatal().Err(err).Msg("empty AI URL")
+	}
+	if agentCfg.AIToken == "" {
+		log.Fatal().Err(err).Msg("empty AI Token")
+	}
+	if agentCfg.Model == "" {
+		log.Fatal().Err(err).Msg("empty model")
+	}
+	agentCfg.DDGSearchDisable = true
+	agentCfg.SemanticSearchDisable = true
+	agentCfg.NmapDisable = true
+	agentCfg.SimpleCMDExecutorDisable = true
+	agentCfg.WebReaderDisable = true
+	agentCfg.ReWOODisable = true
+
+	ctx := context.Background()
+	agent := generic.Agent{}
+
+	llm, err := openai.New(
+		openai.WithBaseURL(agentCfg.AIURL),
+		openai.WithToken(agentCfg.AIToken),
+		openai.WithModel(agentCfg.Model),
+		openai.WithAPIVersion("v1"),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("openai.New")
+	}
+	agent.LLM = llm
+
+	toolsExecutor, err := tools.NewToolsExecutor(ctx, agentCfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("tools.NewToolsExecutor")
+	}
+	agent.ToolsExecutor = toolsExecutor
+
 	summarizeService := &summarize.SummarizeService{
-		HelperURL: loadEnv("HELPER_URL"),
-		Model:     loadEnv("MODEL"),
-		ApiToken:  loadEnv("API_TOKEN"),
-		Network:   "local",
+		Agent: agent,
 		LlmOptions: []llms.CallOption{
 			llms.WithStopWords(
 				projectConfig.StopWords,
@@ -81,20 +126,20 @@ func main() {
 		},
 		// Tests only
 		IgnoreCache:    false,
-		OverwriteCache: config.OverwriteCache,
-		CachePath:      *config.CachePath,
+		OverwriteCache: cfg.OverwriteCache,
+		CachePath:      *cfg.CachePath,
 	}
 	var embeddingsService *store.EmbeddingsService
-	if config.UseEmbeddings {
+	if cfg.UseEmbeddings {
 		projectName := filepath.Base(projectConfig.RootPath)
 		vectorStore, err := store.NewVectorStoreWithPreDelete(
-			*config.EmbeddingsAIURL,
-			*config.EmbeddingsAIAPIKey,
-			*config.EmbeddingsDBURL,
+			*cfg.EmbeddingsAIURL,
+			*cfg.EmbeddingsAIAPIKey,
+			*cfg.EmbeddingsDBURL,
 			projectName,
 		)
 		if err != nil {
-			log.Fatalf("store.NewVectorStoreWithPreDelete(...) error: %v", err)
+			log.Fatal().Err(err).Msg("new vector store")
 		}
 
 		embeddingsService = &store.EmbeddingsService{
@@ -105,7 +150,7 @@ func main() {
 
 	pkgFiles, err := projectConfig.BuildPackageFiles()
 	if err != nil {
-		log.Fatalf("projectConfig.BuildPackageFiles() error: %v", err)
+		log.Fatal().Err(err).Msg("build package files")
 	}
 
 	packageRunnerService := packagerunner.PackageRunnerService{
@@ -113,9 +158,9 @@ func main() {
 		ProjectConfig:     projectConfig,
 		SummarizeService:  summarizeService,
 		EmbeddingsService: embeddingsService,
-		ExactPackages:     config.ExactPackages,
-		OverwriteReadme:   config.OverwriteReadme,
-		WithFileSummary:   config.WithFileSummary,
+		ExactPackages:     cfg.ExactPackages,
+		OverwriteReadme:   cfg.OverwriteReadme,
+		WithFileSummary:   cfg.WithFileSummary,
 	}
 
 	fallbackFileResponses,
@@ -124,7 +169,7 @@ func main() {
 		emptyPackageResponses,
 		err := packageRunnerService.RunPackages()
 	if err != nil {
-		log.Fatalf("packageRunnerService.RunPackages() error: %v", err)
+		log.Fatal().Err(err).Msg("run packages")
 	}
 
 	printEmptyWarning("[WARN] %d fallback attempts for files\n", fallbackFileResponses)
@@ -132,15 +177,15 @@ func main() {
 	printEmptyWarning("[WARN] %d fallback attempts for packages\n", fallbackPackageResponses)
 	printEmptyWarning("[WARN] %d empty LLM responses for packages\n", emptyPackageResponses)
 
-	if embeddingsService != nil && config.EmbeddingsSimSearchTestPrompt != nil {
-		results, err := embeddingsService.Store.SimilaritySearch(context.Background(), *config.EmbeddingsSimSearchTestPrompt, 2)
+	if embeddingsService != nil && cfg.EmbeddingsSimSearchTestPrompt != nil {
+		results, err := embeddingsService.Store.SimilaritySearch(context.Background(), *cfg.EmbeddingsSimSearchTestPrompt, 2)
 		if err != nil {
-			log.Fatalf("embeddingsService.Store.SimilaritySearch() error: %v", err)
+			log.Fatal().Err(err).Msg("similaity search")
 		}
 		if len(results) == 0 {
-			log.Fatalf("No similarity search results found for %s test prompt\n", *config.EmbeddingsSimSearchTestPrompt)
+			log.Fatal().Err(err).Msgf("no similarity search results found for %s test prompt", *cfg.EmbeddingsSimSearchTestPrompt)
 		}
-		fmt.Printf("\n\nSimilarity search results for a test prompt \"%s\":\n", *config.EmbeddingsSimSearchTestPrompt)
+		fmt.Printf("\n\nSimilarity search results for a test prompt \"%s\":\n", *cfg.EmbeddingsSimSearchTestPrompt)
 		for i, result := range results {
 			fmt.Printf("%d: score %f\n", i, result.Score)
 			for k, v := range result.Metadata {
@@ -164,7 +209,7 @@ func printEmptyWarning(message string, responses []string) {
 func loadEnv(key string) string {
 	value := os.Getenv(key)
 	if value == "" {
-		log.Fatalf("empty environment key %s", key)
+		log.Fatal().Msg("empty environment key")
 	}
 	return value
 }
@@ -192,7 +237,7 @@ func chooseProjectConfig(projectConfigVariants map[string]*project.ProjectConfig
 		for {
 			var input string
 			if _, err := fmt.Scanln(&input); err != nil {
-				log.Fatalf("fmt.Scanln(...) error: %v", err)
+				log.Fatal().Err(err).Msg("scanln")
 			}
 			if index, err := strconv.Atoi(input); err == nil && index > 0 && index <= len(filenames) {
 				return projectConfigVariants[filenames[index-1]], nil
@@ -248,7 +293,7 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 		if githubBranch != "" {
 			tempDirEl = append(tempDirEl, githubBranch)
 		} else {
-			rem := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+			rem := git.NewRemote(memory.NewStorage(), &gitConfig.RemoteConfig{
 				Name: "origin",
 				URLs: []string{githubLink},
 			})
@@ -339,7 +384,7 @@ func processWorkingDirectory(githubLink, githubBranch, githubUsername, githubTok
 
 func initConfig() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
-		log.Println(err)
+		log.Warn().Err(err).Msg("load .env file")
 	}
 
 	config := Config{}

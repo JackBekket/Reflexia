@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	store "github.com/JackBekket/reflexia/pkg"
 	"github.com/JackBekket/reflexia/pkg/project"
 	"github.com/JackBekket/reflexia/pkg/summarize"
+	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/schema"
 )
 
@@ -118,13 +118,13 @@ func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []st
 			}
 		}
 		if pkgDir == "" {
-			log.Println("There is no mathcing files for pkg: ", pkg)
+			log.Info().Msgf("There is no mathcing files for pkg: %s", pkg)
 			continue
 		}
 
 		fileStructure, err := getDirFileStructure(pkgDir)
 		if err != nil {
-			log.Print(err)
+			log.Warn().Err(err).Msg("pkg/package_runner/package_runner.go:125: getDirFileStructure error")
 		}
 
 		fmt.Printf("\nSummary for a package %s: \n", pkg)

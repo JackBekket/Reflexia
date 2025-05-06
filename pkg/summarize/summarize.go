@@ -1,6 +1,7 @@
 package summarize
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -9,15 +10,12 @@ import (
 	"os"
 	"path/filepath"
 
-	helper "github.com/JackBekket/hellper/lib/langchain"
+	"github.com/Swarmind/libagent/pkg/agent/generic"
 	"github.com/tmc/langchaingo/llms"
 )
 
 type SummarizeService struct {
-	HelperURL      string
-	Model          string
-	ApiToken       string
-	Network        string
+	Agent          generic.Agent
 	LlmOptions     []llms.CallOption
 	OverwriteCache bool
 	IgnoreCache    bool
@@ -25,6 +23,7 @@ type SummarizeService struct {
 }
 
 func (s *SummarizeService) LLMRequest(format string, a ...string) (string, error) {
+	ctx := context.Background()
 	finalPrompt := fmt.Sprintf(format, a)
 	cacheHash, err := hashStrings(finalPrompt)
 	if err != nil {
@@ -40,8 +39,8 @@ func (s *SummarizeService) LLMRequest(format string, a ...string) (string, error
 	}
 
 	if response == "" {
-		if response, err = helper.GenerateContentInstruction(s.HelperURL,
-			finalPrompt, s.Model, s.ApiToken, s.Network, s.LlmOptions...,
+		if response, err = s.Agent.SimpleRun(
+			ctx, finalPrompt, s.LlmOptions...,
 		); err != nil {
 			return "", err
 		}
