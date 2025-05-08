@@ -3,7 +3,7 @@ module github.com/JackBekket/reflexia
 go 1.24.2
 
 require (
-	github.com/Swarmind/libagent v0.0.0-20250506225659-9e7f3aa41f8a
+	github.com/Swarmind/libagent v0.0.0-20250508172343-6c695fd40ef7
 	github.com/crackcomm/go-gitignore v0.0.0-20231225121904-e25f5bc08668
 	github.com/go-git/go-git/v5 v5.16.0
 	github.com/jackc/pgx/v5 v5.7.4

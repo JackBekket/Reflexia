@@ -11,9 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Swarmind/libagent/pkg/agent/generic"
+	"github.com/Swarmind/libagent/pkg/agent/simple"
 	"github.com/Swarmind/libagent/pkg/config"
-	"github.com/Swarmind/libagent/pkg/tools"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -89,15 +88,8 @@ func main() {
 	if agentCfg.Model == "" {
 		log.Fatal().Err(err).Msg("empty model")
 	}
-	agentCfg.DDGSearchDisable = true
-	agentCfg.SemanticSearchDisable = true
-	agentCfg.NmapDisable = true
-	agentCfg.SimpleCMDExecutorDisable = true
-	agentCfg.WebReaderDisable = true
-	agentCfg.ReWOODisable = true
 
-	ctx := context.Background()
-	agent := generic.Agent{}
+	agent := &simple.Agent{}
 
 	llm, err := openai.New(
 		openai.WithBaseURL(agentCfg.AIURL),
@@ -109,12 +101,6 @@ func main() {
 		log.Fatal().Err(err).Msg("openai.New")
 	}
 	agent.LLM = llm
-
-	toolsExecutor, err := tools.NewToolsExecutor(ctx, agentCfg)
-	if err != nil {
-		log.Fatal().Err(err).Msg("tools.NewToolsExecutor")
-	}
-	agent.ToolsExecutor = toolsExecutor
 
 	summarizeService := &summarize.SummarizeService{
 		Agent: agent,

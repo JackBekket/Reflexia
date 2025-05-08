@@ -1,15 +1,13 @@
 package main
 
 import (
-	"context"
 	"strings"
 	"testing"
 
 	"github.com/JackBekket/reflexia/pkg/project"
 	"github.com/JackBekket/reflexia/pkg/summarize"
-	"github.com/Swarmind/libagent/pkg/agent/generic"
+	"github.com/Swarmind/libagent/pkg/agent/simple"
 	"github.com/Swarmind/libagent/pkg/config"
-	"github.com/Swarmind/libagent/pkg/tools"
 	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -156,15 +154,8 @@ func TestLLMResponse(t *testing.T) {
 	if agentCfg.Model == "" {
 		log.Fatal().Err(err).Msg("empty model")
 	}
-	agentCfg.DDGSearchDisable = true
-	agentCfg.SemanticSearchDisable = true
-	agentCfg.NmapDisable = true
-	agentCfg.SimpleCMDExecutorDisable = true
-	agentCfg.WebReaderDisable = true
-	agentCfg.ReWOODisable = true
 
-	ctx := context.Background()
-	agent := generic.Agent{}
+	agent := &simple.Agent{}
 
 	llm, err := openai.New(
 		openai.WithBaseURL(agentCfg.AIURL),
@@ -176,12 +167,6 @@ func TestLLMResponse(t *testing.T) {
 		log.Fatal().Err(err).Msg("openai.New")
 	}
 	agent.LLM = llm
-
-	toolsExecutor, err := tools.NewToolsExecutor(ctx, agentCfg)
-	if err != nil {
-		log.Fatal().Err(err).Msg("tools.NewToolsExecutor")
-	}
-	agent.ToolsExecutor = toolsExecutor
 
 	summarizeService := &summarize.SummarizeService{
 		Agent: agent,

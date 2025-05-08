@@ -10,12 +10,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Swarmind/libagent/pkg/agent/generic"
+	"github.com/Swarmind/libagent/pkg/agent"
 	"github.com/tmc/langchaingo/llms"
 )
 
 type SummarizeService struct {
-	Agent          generic.Agent
+	Agent          agent.Agent
 	LlmOptions     []llms.CallOption
 	OverwriteCache bool
 	IgnoreCache    bool
