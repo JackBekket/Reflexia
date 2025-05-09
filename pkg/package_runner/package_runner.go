@@ -252,7 +252,7 @@ func fileMapToString(fileMap map[string]string) string {
 	return content
 }
 func getDirFileStructure(workdir string) (string, error) {
-	content := fmt.Sprintf("%s directory file structure:\n", filepath.Base(workdir))
+	content := fmt.Sprintf("%s directory file structure:\n", filepath.Base(filepath.Dir(workdir)))
 	entries := []string{}
 	if err := util.WalkDirIgnored(workdir, "", func(path string, d fs.DirEntry) error {
 		if d.IsDir() {

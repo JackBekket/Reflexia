@@ -117,7 +117,7 @@ func main() {
 	}
 	var embeddingsService *store.EmbeddingsService
 	if cfg.UseEmbeddings {
-		projectName := filepath.Base(projectConfig.RootPath)
+		projectName := filepath.Base(filepath.Dir(projectConfig.RootPath))
 		vectorStore, err := store.NewVectorStoreWithPreDelete(
 			*cfg.EmbeddingsAIURL,
 			*cfg.EmbeddingsAIAPIKey,
