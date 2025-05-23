@@ -8,20 +8,20 @@ This package provides the command-line interface (CLI) for the Reflexia tool, en
 
 ## Configuration
 ### Environment Variables
-- `GH_TOKEN`: Used for GitHub authentication (overrides `-t`/`--github-token` flags).
+- `GH_TOKEN`: Used for GitHub authentication (overrides `-t` flags).
 
 ### Command-line Flags
-- `-a, --cache-path`: Cache folder path (default: `.reflexia_cache`)
-- `-eu, --embeddings-ai-url`: Embeddings AI URL
-- `-ea, --embeddings-ai-token`: Embeddings AI API Key
-- `-ed, --embeddings-db-url`: Embeddings DB connect URL
-- `-et, --embeddings-sim-test-prompt`: Embeddings similarity test prompt
-- `-g, --repo-url`: GitHub repository URL
-- `-b, --repo-branch`: GitHub repository branch
-- `-u, --github-username`: GitHub username for SSH auth
-- `-t, --github-token`: GitHub token for SSH auth (overrides `GH_TOKEN`)
-- `-l, --with-config-file`: Config filename in project_config to use
-- `-p, --exact-packages`: Exact package names (comma delimited)
+- `-a`: Cache folder path (default: `.reflexia_cache`)
+- `-eu`: Embeddings AI URL
+- `-ea`: Embeddings AI API Key
+- `-ed`: Embeddings DB connect URL
+- `-et`: Embeddings similarity test prompt
+- `-g`: GitHub repository URL
+- `-b`: GitHub repository branch
+- `-u`: GitHub username for SSH auth
+- `-t`: GitHub token for SSH auth (overrides `GH_TOKEN`)
+- `-l`: Config filename in project_config to use
+- `-p`: Exact package names (comma delimited)
 - `-w`: Create PR (implies `ReflexiaOpts.CreatePR = true`)
 - `-c`: Skip project root checks (implies `ReflexiaOpts.LightCheck = true`)
 - `-f`: Save file summaries to FILES.md (implies `ReflexiaOpts.WithFileSummary = true`)
