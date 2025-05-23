@@ -1,73 +1,143 @@
 # Reflexia
 
-Reflexia is a code summarizer that can be used to generate summaries of code files in a project. It uses a combination of command-line arguments, environment variables, and configuration files to determine how to process the code. The project also includes a helper service that can be used to generate summaries of code snippets.
+A tool for analyzing and managing software projects, providing both an API and CLI interface for handling project configurations, code analysis, and integration with GitHub.
 
-## Project Configuration
+---
 
-The project uses a configuration file to specify the settings for the summarizer. The configuration file can be specified using the `-l` flag. The configuration file can be in TOML format and contains the following fields:
+## 📦 Project Structure
 
-- FileFilter: A list of file extensions to include in the summarization process.
-- ProjectRootFilter: A list of file extensions to exclude from the summarization process.
-- ModuleMatch: A regular expression to match module names.
-- StopWords: A list of words to ignore during summarization.
-- CodePrompt: A prompt to use when generating summaries of code snippets.
-- SummaryPrompt: A prompt to use when generating summaries of text.
-- PackagePrompt: A prompt to use when generating summaries of package-level code.
-- ReadmePrompt: A prompt to use when generating summaries of README files.
-- RootPath: The root directory of the project.
+- **`cmd/api`**: API server entry point (`api.go`). Handles HTTP API endpoints.
+- **`cmd/cli`**: CLI tool entry point (`main.go`). Executes command-line operations.
+- **`internal/`**: Internal logic (e.g., `github/pull_request.go`, `project/choosers.go`).
+- **`pkg/`**: Core functionality (e.g., `config`, `project`, `store`, `summarize`).
+- **`project_config/`**: Language-specific configuration files (TOML: `cpp.toml`, `go.toml`, etc.).
 
-## Summarization Process
+---
 
-The summarization process begins by reading the configuration file and parsing the settings. The project then iterates through the files in the project directory, excluding any files specified in the `.gitignore` file. For each file, it checks if it matches any of the file filters specified in the configuration file. If a match is found, the file content is read, and a summary is generated using the appropriate prompt from the configuration file. The summaries are then stored in a map, where the key is the relative path to the file, and the value is the generated summary.
+## 🛠 Behavior Control
 
-## Output
+### 🔧 Configuration Options
 
-The project generates several output files:
+**Loaded via `pkg/config`**: Values are defined in project-specific TOML files (e.g., `project_config/go.toml`).  
+**Effects**:
+- Determines supported languages and analysis rules.
+- Controls project handling and GitHub integration behavior.
+- **No explicit validation** of configuration values in the provided code.
 
-- `FILES.md`: A markdown file containing the summaries of all files in the project.
-- `README.md`: A markdown file containing the summaries of all README files in the project.
-- `SUMMARY.md`: A markdown file containing the summaries of all files in the project.
+### ⚙ Build Tags
 
-The project also has the option to create a README file for each package in the project, as well as to overwrite the existing README file in the root project directory.
+- **`api`**: Enables API server functionality (excludes CLI code).
+- **`!api`**: Disables API server (only CLI is active).
 
-## Edge Cases
+---
 
-The project has several edge cases that can be handled using command-line arguments:
+## 🧩 External Configuration Options
 
-- `-c`: Do not check project root folder specific files such as go.mod or package.json.
-- `-s`: Do not create SUMMARY.md and README.md, just print the file summaries.
-- `-r`: Do not create README.md.
-- `-p`: Do not create README.md for every package in the project.
-- `-br`: Overwrite README.md for the root project directory instead of creating README_GENERATED.md.
-- `-f`: Save individual file summary intermediate result to the FILES.md.
-- `-bp`: Create README_GENERATED.md if README.md exists in the package directory instead of overwriting.
+### 📦 Environment Variables
 
-## Environment Variables
+| Variable | Description | Notes |
+|--------|-------------|-------|
+| `GH_TOKEN` | GitHub authentication token (overrides `-t`/`--github-token` flags) | CLI only |
+| `LISTEN_ADDR` | API server listen address (required) | API only |
+| `CORS_ALLOW_ORIGINS` | Comma-separated list of allowed CORS origins (required) | API only |
 
-The project uses the following environment variables:
+### 🛠 Command-line Flags (CLI Only)
 
-- `HELPER_URL`: Helper URL.
-- `MODEL`: Model.
-- `API_TOKEN`: API token.
+| Flag | Description |
+|------|-------------|
+| `-a, --cache-path` | Cache folder path (default: `.reflexia_cache`) |
+| `-eu, --embeddings-ai-url` | Embeddings AI URL |
+| `-ea, --embeddings-ai-token` | Embeddings AI API Key |
+| `-ed, --embeddings-db-url` | Embeddings DB connect URL |
+| `-et, --embeddings-sim-test-prompt` | Embeddings similarity test prompt |
+| `-g, --repo-url` | GitHub repository URL |
+| `-b, --repo-branch` | GitHub repository branch |
+| `-u, --github-username` | GitHub username for SSH auth |
+| `-t, --github-token` | GitHub token for SSH auth (overrides `GH_TOKEN`) |
+| `-l, --with-config-file` | Config filename in `project_config` to use |
+| `-p, --exact-packages` | Exact package names (comma delimited) |
+| `-w` | Create PR (implies `ReflexiaOpts.CreatePR = true`) |
+| `-c` | Skip project root checks (implies `ReflexiaOpts.LightCheck = true`) |
+| `-f` | Save file summaries to `FILES.md` (implies `ReflexiaOpts.WithFileSummary = true`) |
+| `-r` | Overwrite `README.md` (implies `ReflexiaOpts.OverwriteReadme = true`) |
+| `-d` | Overwrite cache (implies `ReflexiaOpts.OverwriteCache = true`) |
+| `-e` | Use embeddings (implies `ReflexiaOpts.UseEmbeddings = true`) |
 
-## Run Instructions
+---
 
-1. Make sure you have the necessary dependencies installed.
-2. Create a configuration file in TOML format and specify the settings for the summarizer.
-3. Run the project with the desired command-line arguments and environment variables.
+## ⚠ Limitations & Notes
 
-## Example
+### General
+- **No error handling** for failed configuration loading or API startup.
+- **Potential panics** if `config.NewConfig()` returns invalid data.
+- **Unaddressed edge cases**: Behavior when configuration files are missing or malformed.
 
+### CLI Specific
+- `printEmptyWarning` only outputs warnings for **non-empty** response lists.
+- `agentConfig` is **separate** from the main config and is loaded via `agentConfig.NewConfig()`.
+- **Edge Cases**: 
+  - If `RepositoryURL` is empty and command-line arguments exist, the first argument is treated as a local working directory.
+  - Invalid URLs or missing `go.toml` files in projects will cause failures.
+- **Test Issues**: 
+  - `TestProcessWorkingDirectory` has a duplicate test case.
+  - No handling of invalid project directories in core functions (only tested via edge cases).
+- **Dead Code**: 
+  - `TestProcessWorkingDirectoryIgnore` is not implemented in the core logic.
+
+### API Specific
+- API endpoints `/project_configs` and `/reflect` are not fully documented in OpenAPI.
+- No error handling for invalid OpenAPI routes.
+- Workdir is determined at startup and used by the APIService.
+- Environment variables `LISTEN_ADDR` and `CORS_ALLOW_ORIGINS` are critical; missing values cause panic.
+
+---
+
+## 📌 Usage
+
+### CLI
+Run the CLI to analyze projects, interact with GitHub, or manage configurations:
 ```bash
-reflexia -l config.toml -c -s -r -p -br -f -bp
+go build . -o reflexia
+reflexia [flags] [args]
 ```
 
-
-
-This command will run the Reflexia project using the configuration file `config.toml`, exclude project root folder specific files, not create SUMMARY.md and README.md, not create README.md for every package in the project, overwrite README.md for the root project directory instead of creating README_GENERATED.md, save individual file summary intermediate result to the FILES.md, and create README_GENERATED.md if README.md exists in the package directory instead of overwriting.
-
-
+### API
+Start the API server with:
 ```bash
-./reflexia -l go.toml -f -d  -g https://github.com/JackBekket/Hellper
+go build -tags=api . -o reflexia-api
+reflexia-api
 ```
-This command will start to autodocumentize -g repository (public), it will create README_GENERATED.MD and create summary for all files
+Ensure environment variables `LISTEN_ADDR` and `CORS_ALLOW_ORIGINS` are set.
+
+---
+
+## 📝 Project Goals
+
+- Provide a unified interface for project analysis and GitHub integration.
+- Support multiple languages via project-specific configurations.
+- Enable both CLI and API usage for flexibility.
+
+---
+
+## 🧩 Project Configurations
+
+Project-specific configurations are stored in `project_config/` as TOML files (e.g., `go.toml`, `cpp.toml`). These files define:
+- Supported languages.
+- Analysis rules.
+- Project handling behavior.
+- GitHub integration policies.
+
+---
+
+## 📦 Project Scope
+
+This project is intended for developers who want to:
+- Analyze and manage software projects.
+- Integrate with GitHub for code analysis and PR automation.
+- Use both CLI and API interfaces for project management tasks.
+
+---
+
+## 📦 Project Status
+
+This project is in early development. It provides basic functionality for project analysis and GitHub integration, but lacks full error handling, comprehensive documentation, and complete test coverage. Contributions are welcome.

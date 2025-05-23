@@ -1,32 +1,38 @@
 # project
 
-This package provides a way to configure and manage project files based on a set of filters and prompts. It reads configuration from .toml files and builds a map of package names to file paths. The package also includes functions to check if files match specific filters and to determine if a directory contains a root filter file.
-
-## ProjectConfig
-
-The `ProjectConfig` struct holds the configuration for the project, including file filters, project root filters, module matches, stop words, code prompts, summary prompts, package prompts, readme prompts, and the root path.
-
-## GetProjectConfig
-
-The `GetProjectConfig` function reads all .toml files in the current directory and its subdirectories and returns the first matching `ProjectConfig` found. If no matching `ProjectConfig` is found, it returns an error.
-
-## BuildPackageFiles
-
-The `BuildPackageFiles` function builds a map of package names to a list of file paths based on the provided `ProjectConfig`.
-
-## hasFilterFiles
-
-The `hasFilterFiles` function checks if any of the files in the given directory match any of the filters provided. It returns true if a match is found, false otherwise.
-
-## hasRootFilterFile
-
-The `hasRootFilterFile` function checks if any of the files in the given directory match any of the filters provided. It returns true if a match is found, false otherwise.
+The `project` package handles project configuration loading and management, providing tools to select between multiple configurations based on project files and environmental constraints.
 
 ## File Structure
 
-```
-pkg/
-  project/
-    project.go
-```
+- **choosers.go**: Contains configuration selection logic (`FirstChooser`, `CLIChooser`).
+- **project.go**: Manages `ProjectConfig` loading, validation, and file processing.
 
+## What It Does
+
+This package provides:
+- Loading and parsing of project configurations from TOML files.
+- Mechanisms to choose between multiple project configurations (e.g., first available, CLI interaction).
+- Handling of project-specific logic like file filtering, directory grouping, and package management.
+
+## Configuration
+
+### External Data/Configuration Options
+- **TOML Files**: Define `ProjectConfig` behavior (loaded into struct fields).
+- **ProjectConfig Fields**:
+  - `FileFilter []string`: File suffix filters (e.g., `.go`).
+  - `ProjectRootFilter []string`: Root directory filters (e.g., `go.mod`).
+  - `ModuleMatch string`: Must be `directory` or `go_package` (controls file grouping).
+  - `StopWords []string`: Words to ignore during processing.
+  - `Prompts map[string]ProjectConfigPrompts`: Custom prompts for code/package handling.
+  - `RootPath string`: Project root directory path.
+
+### Supported Languages
+- Hardcoded support for `go`, `python`, `typescript` (in error messages).
+
+## Notes
+
+- `ProjectConfig` type is **not defined in this package** (assumed to be defined elsewhere).
+- `CLIChooser` has **unhandled edge cases** (e.g., invalid inputs, infinite loops).
+- `FirstChooser` returns the first sorted key from `projectConfigVariants` (behavior not fully explained in code).
+- `BuildPackageFiles()` **fails** if `ModuleMatch` is not `directory` or `go_package`.
+- `ProjectConfig` fields like `Prompts` have **fallback behavior** (not explicitly documented).

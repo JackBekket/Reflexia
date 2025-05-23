@@ -1,10 +1,12 @@
 file_filter = [".go"]
 project_root_filter = ["go.mod", "src/go.mod"]
-module_match = "package_name"
+module_match = "go_package"
 stop_words = ["<end_of_output>"]
 
-# this prompt takes all content generated to files and maka a summary for a package, therefore group code generatation output by package name. It is second call from main loop
-package_prompt = """
+[prompts.default]
+# this prompt takes all content generated to files and maka a summary for a package,
+# therefore group code generatation output by package name. It is second call from main loop
+package = """
 Based on provided input from the summary of project package files create a markdown summary of what that package code does.
 First write a short summary about provided files code summary.
 Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
@@ -19,7 +21,7 @@ It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 """
 
 #summarize -- this is not just a summarization but attempt to write chunk of documentation
-code_prompt = """
+code = """
 Your task is to summarize the provided code (file content) which could be part of a package or other component.
 As a result you would have a summarized info about provided part of code within one package/component, and this result will be used to create summary about whole package
 First you need to write the package/component name and collect all the imports.
@@ -33,7 +35,7 @@ It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 Provided code:
 """
 
-package_prompt_fallback = """
+package_fallback = """
 Based on provided input from the summary of project package files create a markdown summary of what that package code does.
 First write a short summary about provided files code summary.
 Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
@@ -44,4 +46,35 @@ Try to explain relations between code entities, try to find unclear places, poss
 If unclear places or dead code are not present - don't write anything about their absense.
 Try to be clear, concise, and brief.
 The main goal is to summarize the logic of the whole package.
+"""
+
+[prompts."qwen3.*"]
+# this prompt takes all content generated to files and maka a summary for a package,
+# therefore group code generatation output by package name. It is second call from main loop
+package = """
+You are the package summarizer tool.
+Your task it to write a short README.md summary about the package, based on fed summaries about each package file(s).
+If there are only one file in the package - just slightly reformat that file summary to fit into the structure described next.
+
+Please write the package name first.
+Describe what the package does.
+Describe the relations between package files (if many), write out package file structure.
+If present - describe precisely which external data or configuration options (DO NOT SKIP ANY OPTION!) can be used to affect to the package behavior.
+If there any unclear places, dead code - write about them.
+
+Begin!
+"""
+
+#summarize -- this is not just a summarization but attempt to write chunk of documentation
+code = """
+You are the code summarizer tool.
+Your task is to write a short markdown summary about the provided golang .go file content.
+Produce a markdown output (don't wrap it in ```markdown ``` tags), grouped by sections.
+
+Please write the package name first, then collect all the imports.
+Describe every major code part - which inputs it needs, which outputs it produces, and how it's done.
+It present - describe precisely which external data, or configuration options (DO NOT SKIP ANY OPTION!) can be used in code.
+If there any TODOs, comments, unclear places, edgecases - write about them.
+
+Begin!
 """

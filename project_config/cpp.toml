@@ -1,10 +1,12 @@
 file_filter = [".cpp",".h",".hpp",".c",".cu",".cuh"]
 project_root_filter = ["CMakeLists.txt"]
-module_match = "package_name"
+module_match = "directory"
 stop_words = ["<end_of_output>"]
 
-# this prompt takes all content generated to files and maka a summary for a package, therefore group code generatation output by package name. It is second call from main loop
-package_prompt = """
+[prompts.default]
+# this prompt takes all content generated to files and maka a summary for a package,
+# therefore group code generatation output by package name. It is second call from main loop
+package = """
 Based on provided input from the summary of project package files create a markdown summary of what that package code does.
 First write a short summary about provided files code summary.
 Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.
@@ -19,7 +21,7 @@ It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 """
 
 #summarize -- this is not just a summarization but attempt to write chunk of documentation
-code_prompt = """
+code = """
 Your task is to summarize the provided code (file content) which could be part of a package or other component.
 As a result you would have a summarized info about provided part of code within one package/component, and this result will be used to create summary about whole package
 First you need to write the package/component name and collect all the imports.
@@ -33,7 +35,7 @@ It is mandatory to prepend the '<end_of_output>' at the very end of your output.
 Provided code:
 """
 
-package_prompt_fallback = """
+package_fallback = """
 Based on provided input from the summary of project package files create a markdown summary of what that package code does.
 First write a short summary about provided files code summary.
 Always list and specify environment variables, flags, cmdline arguments, files and their paths that can be used for configuration if they present.

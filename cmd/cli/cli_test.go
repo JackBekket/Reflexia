@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"strings"
@@ -177,6 +177,8 @@ func TestLLMResponse(t *testing.T) {
 			llms.WithRepetitionPenalty(0.7),
 		},
 		IgnoreCache: true,
+		StopWords:   projectConfig.StopWords,
+		Model:       agentCfg.Model,
 	}
 	t.Run(
 		"Test LLM response",

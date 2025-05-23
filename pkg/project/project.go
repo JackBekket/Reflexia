@@ -2,6 +2,7 @@ package project
 
 import (
 	"errors"
+	"fmt"
 	"go/parser"
 	"go/token"
 	"io"
@@ -10,22 +11,26 @@ import (
 	"path/filepath"
 	"strings"
 
-	util "github.com/JackBekket/reflexia/internal"
-	"github.com/rs/zerolog/log"
+	"github.com/JackBekket/reflexia/internal/util"
 
 	"github.com/pelletier/go-toml/v2"
 )
 
 type ProjectConfig struct {
-	FileFilter            []string `toml:"file_filter"`
-	ProjectRootFilter     []string `toml:"project_root_filter"`
-	ModuleMatch           string   `toml:"module_match"`
-	StopWords             []string `toml:"stop_words"`
-	CodePrompt            string   `toml:"code_prompt"`
-	CodePromptFallback    *string  `toml:"code_prompt_fallback"`
-	PackagePrompt         string   `toml:"package_prompt"`
-	PackagePromptFallback *string  `toml:"package_prompt_fallback"`
-	RootPath              string
+	FileFilter        []string                        `toml:"file_filter"`
+	ProjectRootFilter []string                        `toml:"project_root_filter"`
+	ModuleMatch       string                          `toml:"module_match"`
+	StopWords         []string                        `toml:"stop_words"`
+	Prompts           map[string]ProjectConfigPrompts `toml:"prompts"`
+
+	RootPath string
+}
+
+type ProjectConfigPrompts struct {
+	CodePrompt            string  `toml:"code"`
+	CodePromptFallback    *string `toml:"code_fallback"`
+	PackagePrompt         string  `toml:"package"`
+	PackagePromptFallback *string `toml:"package_fallback"`
 }
 
 func GetProjectConfig(
@@ -46,10 +51,43 @@ func GetProjectConfig(
 		}
 	}
 
+	projectConfigs, err := ListProjectConfigs(currentDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("list project configs: %w", err)
+	}
+
+	if config, exists := projectConfigs[filepath.Base(withConfigFile)]; exists {
+		return map[string]*ProjectConfig{withConfigFile: &config}, nil
+	}
+
+	var projectConfigVariants = map[string]*ProjectConfig{}
+	for filename, config := range projectConfigs {
+		foundFilterFiles, err := hasFilterFiles(currentDirectory, config.FileFilter)
+		if err != nil {
+			return nil, fmt.Errorf("has filter files: %w", err)
+		}
+
+		if lightCheck && foundFilterFiles {
+			projectConfigVariants[filename] = &config
+			continue
+		}
+
+		foundRootFilterFile, err := hasRootFilterFile(currentDirectory, config.ProjectRootFilter)
+		if err != nil {
+			return nil, fmt.Errorf("has root filter file: %w", err)
+		}
+		if foundFilterFiles && foundRootFilterFile {
+			projectConfigVariants[filename] = &config
+		}
+	}
+	return projectConfigVariants, nil
+}
+
+func ListProjectConfigs(currentDirectory string) (map[string]ProjectConfig, error) {
 	var projectConfigs = map[string]ProjectConfig{}
 
 	if err := util.WalkDirIgnored(
-		"project_config", filepath.Join(currentDirectory, ".gitignore"),
+		"project_config", "",
 		func(path string, d fs.DirEntry) error {
 			if d.IsDir() {
 				return nil
@@ -71,20 +109,7 @@ func GetProjectConfig(
 		return nil, err
 	}
 
-	if config, exists := projectConfigs[filepath.Base(withConfigFile)]; exists {
-		return map[string]*ProjectConfig{withConfigFile: &config}, nil
-	}
-	var projectConfigVariants = map[string]*ProjectConfig{}
-	for filename, config := range projectConfigs {
-		if lightCheck && hasFilterFiles(currentDirectory, config.FileFilter) {
-			projectConfigVariants[filename] = &config
-		}
-		if hasFilterFiles(currentDirectory, config.FileFilter) &&
-			hasRootFilterFile(currentDirectory, config.ProjectRootFilter) {
-			projectConfigVariants[filename] = &config
-		}
-	}
-	return projectConfigVariants, nil
+	return projectConfigs, nil
 }
 
 func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
@@ -118,7 +143,7 @@ func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
 			return nil, err
 		}
 
-	case "package_name":
+	case "go_package":
 		if err := util.WalkDirIgnored(
 			pc.RootPath,
 			filepath.Join(pc.RootPath, ".gitignore"),
@@ -130,11 +155,11 @@ func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
 						if err != nil {
 							return err
 						}
-						key := ast.Name.Name
 						relPath, err := filepath.Rel(pc.RootPath, path)
 						if err != nil {
 							return err
 						}
+						key := fmt.Sprintf("%s:%s", filepath.Dir(relPath), ast.Name.Name)
 
 						if _, exists := packageFileMap[key]; !exists {
 							packageFileMap[key] = []string{}
@@ -155,7 +180,7 @@ func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
 	return packageFileMap, nil
 }
 
-func hasFilterFiles(workdir string, filters []string) bool {
+func hasFilterFiles(workdir string, filters []string) (bool, error) {
 	found := false
 
 	err := util.WalkDirIgnored(
@@ -173,21 +198,21 @@ func hasFilterFiles(workdir string, filters []string) bool {
 		err = nil
 	}
 	if err != nil {
-		log.Fatal().Err(err).Msg("pkg/project/project.go:161")
+		return false, err
 	}
-	return found
+	return found, nil
 }
 
-func hasRootFilterFile(workdir string, filters []string) bool {
+func hasRootFilterFile(workdir string, filters []string) (bool, error) {
 	for _, filter := range filters {
 		if _, err := os.Stat(filepath.Join(workdir, filter)); err != nil {
 			if !os.IsNotExist(err) {
-				panic(err)
+				return false, err
 			}
 		} else {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }

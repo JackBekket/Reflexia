@@ -1,5 +1,5 @@
-EMBEDDINGS_AI_KEY="whosyourdaddy"
-EMBEDDINGS_AI_URL=http://0.0.0.0/lai/federated
+EMBEDDINGS_AI_URL=https://api.swarmind.ai/lai/testing
+EMBEDDINGS_AI_TOKEN=""
 EMBEDDINGS_DB_URL=postgresql://...
 
 LIBAGENT_ENV_PREFIX=LIBAGENT
@@ -7,3 +7,7 @@ LIBAGENT_ENV_PREFIX=LIBAGENT
 LIBAGENT_AI_URL="https://api.swarmind.ai/lai/testing"
 LIBAGENT_AI_TOKEN=""
 LIBAGENT_MODEL="big-tiger-gemma-27b-v1"
+
+# For api binary
+LISTEN_ADDR=":8081"
+CORS_ALLOW_ORIGINS=http://127.0.0.1:8081

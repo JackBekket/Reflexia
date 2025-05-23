@@ -2,9 +2,9 @@ package store
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/vectorstores"
@@ -15,47 +15,43 @@ type EmbeddingsService struct {
 	Store vectorstores.VectorStore
 }
 
-func NewVectorStoreWithPreDelete(ai_url string, api_token string, db_link string, name string) (vectorstores.VectorStore, error) {
-	base_url := ai_url
-	pgConnURL := db_link
-
-	config, err := pgxpool.ParseConfig(pgConnURL)
+func NewVectorStoreWithPreDelete(
+	ctx context.Context,
+	aiURL, aiToken, dbURL, name string,
+) (vectorstores.VectorStore, error) {
+	config, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new pool: %w", err)
 	}
 
 	llm, err := openai.New(
-		openai.WithBaseURL(base_url),
-		openai.WithAPIVersion("v1"),
+		openai.WithBaseURL(aiURL),
+		openai.WithToken(aiToken),
 		openai.WithEmbeddingModel("text-embedding-ada-002"),
-		openai.WithToken(api_token),
+		openai.WithAPIVersion("v1"),
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("pkg/store.go:32")
+		return nil, fmt.Errorf("new openai: %w", err)
 	}
 
 	e, err := embeddings.NewEmbedder(llm)
 	if err != nil {
-		log.Fatal().Err(err).Msg("pkg/store.go:42")
-	}
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new embedder: %w", err)
 	}
 
-	store, err := pgvector.New(
-		context.Background(),
+	store, err := pgvector.New(ctx,
 		pgvector.WithCollectionName(name),
 		pgvector.WithPreDeleteCollection(true),
 		pgvector.WithConn(pool),
 		pgvector.WithEmbedder(e),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create store: %w", err)
 	}
 
 	return store, nil

@@ -9,8 +9,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Swarmind/libagent/pkg/agent"
+	agentUtil "github.com/Swarmind/libagent/pkg/util"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -20,12 +22,13 @@ type SummarizeService struct {
 	OverwriteCache bool
 	IgnoreCache    bool
 	CachePath      string
+	StopWords      []string
+	Model          string
 }
 
-func (s *SummarizeService) LLMRequest(format string, a ...string) (string, error) {
-	ctx := context.Background()
-	finalPrompt := fmt.Sprintf(format, a)
-	cacheHash, err := hashStrings(finalPrompt)
+func (s SummarizeService) LLMRequest(ctx context.Context, format string, a ...any) (string, error) {
+	finalPrompt := fmt.Sprintf(format, a...)
+	cacheHash, err := hashStrings(finalPrompt + s.Model)
 	if err != nil {
 		return "", err
 	}
@@ -38,22 +41,29 @@ func (s *SummarizeService) LLMRequest(format string, a ...string) (string, error
 		}
 	}
 
-	if response == "" {
-		if response, err = s.Agent.SimpleRun(
-			ctx, finalPrompt, s.LlmOptions...,
-		); err != nil {
-			return "", err
-		}
-		if !s.IgnoreCache {
-			if err = saveCache(s.CachePath, cacheHash, response); err != nil {
-				return "", err
-			}
-		}
-	} else {
-		fmt.Printf("Using cached result:\n%s\n", response)
+	if response != "" {
+		return response, nil
 	}
 
-	return response, err
+	if response, err = s.Agent.SimpleRun(
+		ctx, finalPrompt, s.LlmOptions...,
+	); err != nil {
+		return "", err
+	}
+
+	response = agentUtil.RemoveThinkTag(response)
+	for _, stopWord := range s.StopWords {
+		response = strings.TrimSuffix(response, stopWord)
+	}
+	response = strings.TrimSpace(response)
+
+	if !s.IgnoreCache {
+		if err = saveCache(s.CachePath, cacheHash, response); err != nil {
+			return "", err
+		}
+	}
+
+	return response, nil
 }
 
 func hashStrings(a ...string) (string, error) {

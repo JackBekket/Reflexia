@@ -29,3 +29,9 @@ temp
 
 # default cache path
 .reflexia_cache
+
+# vscode
+.vscode
+
+# macos
+.DS_Store

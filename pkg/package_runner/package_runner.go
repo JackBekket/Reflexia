@@ -3,86 +3,129 @@ package packagerunner
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
-	util "github.com/JackBekket/reflexia/internal"
-	store "github.com/JackBekket/reflexia/pkg"
+	"github.com/JackBekket/reflexia/internal/util"
 	"github.com/JackBekket/reflexia/pkg/project"
+	"github.com/JackBekket/reflexia/pkg/store"
 	"github.com/JackBekket/reflexia/pkg/summarize"
 	"github.com/rs/zerolog/log"
 	"github.com/tmc/langchaingo/schema"
 )
+
+type RunStats struct {
+	FallbackFileResponses    []string
+	EmptyFileResponses       []string
+	FallbackPackageResponses []string
+	EmptyPackageResponses    []string
+}
 
 type PackageRunnerService struct {
 	PkgFiles          map[string][]string
 	ProjectConfig     *project.ProjectConfig
 	SummarizeService  *summarize.SummarizeService
 	EmbeddingsService *store.EmbeddingsService
-	ExactPackages     *string
+	ExactPackages     string
 	OverwriteReadme   bool
 	WithFileSummary   bool
+
+	Model   string
+	PrintTo io.Writer
 }
 
-func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []string, error) {
-	fallbackFileResponses := []string{}
-	emptyFileResponses := []string{}
-	fallbackPackageResponses := []string{}
-	emptyPackageResponses := []string{}
+func (s *PackageRunnerService) RunPackages(ctx context.Context) (RunStats, error) {
+	stats := RunStats{}
 
-	for pkg, files := range s.PkgFiles {
-		if *s.ExactPackages != "" &&
-			!slices.Contains(strings.Split(*s.ExactPackages, ","), pkg) {
+	pcPrompts, ok := s.ProjectConfig.Prompts["default"]
+	if !ok {
+		return stats, fmt.Errorf("failed to load default prompts")
+	}
+
+	for model, prompts := range s.ProjectConfig.Prompts {
+		if model == "default" {
 			continue
 		}
-		fmt.Printf("\nPackage %s\n", pkg)
+
+		matched, err := regexp.MatchString(model, s.Model)
+		if err == nil && matched {
+			pcPrompts = prompts
+			break
+		}
+	}
+
+	codePrompt := pcPrompts.CodePrompt
+	codePromptFallback := ""
+	if pcPrompts.CodePromptFallback != nil {
+		codePromptFallback = *pcPrompts.CodePromptFallback
+	}
+	packagePrompt := pcPrompts.PackagePrompt
+	packagePromptFallback := ""
+	if pcPrompts.PackagePromptFallback != nil {
+		packagePromptFallback = *pcPrompts.PackagePromptFallback
+	}
+
+	for pkg, files := range s.PkgFiles {
+		if s.ExactPackages != "" &&
+			!slices.Contains(strings.Split(s.ExactPackages, ","), pkg) {
+			continue
+		}
+		fmt.Fprintf(s.PrintTo, "Package %s\n", pkg)
 
 		pkgFileMap := map[string]string{}
 		pkgDir := ""
 		for _, relPath := range files {
-			fmt.Println(relPath)
+			fmt.Fprintf(s.PrintTo, "%s\n", relPath)
 			content, err := os.ReadFile(filepath.Join(s.ProjectConfig.RootPath, relPath))
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return stats, err
 			}
 
 			contentStr := string(content)
 			codeSummaryContent := "Empty file"
 
 			if strings.TrimSpace(contentStr) != "" {
-				codeSummaryContent, err = s.SummarizeService.LLMRequest(
-					"%s```%s```",
-					s.ProjectConfig.CodePrompt, contentStr,
+				codeSummaryContent, err = s.SummarizeService.LLMRequest(ctx,
+					"%s```\n%s\n```",
+					codePrompt, contentStr,
 				)
 				if err != nil {
-					return nil, nil, nil, nil, err
+					return stats, err
 				}
 				if strings.TrimSpace(codeSummaryContent) == "" &&
-					s.ProjectConfig.CodePromptFallback != nil {
-					fallbackFileResponses = append(
-						fallbackFileResponses,
+					codePromptFallback != "" {
+					stats.FallbackFileResponses = append(
+						stats.FallbackFileResponses,
 						filepath.Join(s.ProjectConfig.RootPath, relPath),
 					)
-					codeSummaryContent, err = s.SummarizeService.LLMRequest(
-						"%s```%s```",
-						*s.ProjectConfig.CodePromptFallback, contentStr,
+					codeSummaryContent, err = s.SummarizeService.LLMRequest(ctx,
+						"%s```\n%s\n```",
+						codePromptFallback, contentStr,
 					)
 					if err != nil {
-						return nil, nil, nil, nil, err
+						return stats, err
 					}
 				}
-			} else {
-				fmt.Println("Empty file")
 			}
+			if strings.TrimSpace(codeSummaryContent) == "" {
+				stats.EmptyFileResponses = append(
+					stats.EmptyFileResponses,
+					filepath.Join(s.ProjectConfig.RootPath, relPath),
+				)
+				fmt.Fprintf(s.PrintTo, "[WARN] empty file summary!\n")
+			} else {
+				fmt.Fprintf(s.PrintTo, "%s\n", codeSummaryContent)
+			}
+			fmt.Fprintf(s.PrintTo, "\n")
 
-			fmt.Printf("\n")
 			pkgFileMap[relPath] = codeSummaryContent
 			if s.EmbeddingsService != nil {
-				ids, err := s.EmbeddingsService.Store.AddDocuments(
-					context.Background(),
+				ids, err := s.EmbeddingsService.Store.AddDocuments(ctx,
 					[]schema.Document{
 						{
 							PageContent: string(content),
@@ -102,17 +145,11 @@ func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []st
 					},
 				)
 				if err != nil {
-					return nil, nil, nil, nil, err
+					return stats, err
 				}
-				fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
+				fmt.Fprintf(s.PrintTo, "Succesfully pushed docs %s into embeddings vector store\n", ids)
 			}
 
-			if strings.TrimSpace(codeSummaryContent) == "" {
-				emptyFileResponses = append(
-					emptyFileResponses,
-					filepath.Join(s.ProjectConfig.RootPath, relPath),
-				)
-			}
 			if pkgDir == "" {
 				pkgDir = filepath.Join(s.ProjectConfig.RootPath, filepath.Dir(relPath))
 			}
@@ -122,44 +159,47 @@ func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []st
 			continue
 		}
 
-		fileStructure, err := getDirFileStructure(pkgDir)
+		fileStructure, err := getDirFileStructure(pkg, pkgDir)
 		if err != nil {
-			log.Warn().Err(err).Msg("pkg/package_runner/package_runner.go:125: getDirFileStructure error")
+			log.Warn().Err(err).Msg("getDirFileStructure error")
 		}
 
-		fmt.Printf("\nSummary for a package %s: \n", pkg)
+		fmt.Fprintf(s.PrintTo, "Summary for a package %s: \n", pkg)
 		// Generate Summary for a package (summarizing and group file summarization by package name)
 		// Get whole map of code summaries as a string and toss it to summarize .MD for a package
-		pkgSummaryContent, err := s.SummarizeService.LLMRequest(
+		pkgSummaryContent, err := s.SummarizeService.LLMRequest(ctx,
 			"%s\n\n%s\n%s",
-			s.ProjectConfig.PackagePrompt,
+			packagePrompt,
 			fileStructure,
 			fileMapToString(pkgFileMap),
 		)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return stats, err
 		}
 
-		if strings.TrimSpace(pkgSummaryContent) == "" && s.ProjectConfig.PackagePromptFallback != nil {
-			fallbackPackageResponses = append(fallbackPackageResponses, pkg)
-			pkgSummaryContent, err = s.SummarizeService.LLMRequest(
+		if strings.TrimSpace(pkgSummaryContent) == "" && packagePromptFallback != "" {
+			stats.FallbackPackageResponses = append(stats.FallbackPackageResponses, pkg)
+			pkgSummaryContent, err = s.SummarizeService.LLMRequest(ctx,
 				"%s\n\n%s\n%s",
-				*s.ProjectConfig.PackagePromptFallback,
+				packagePromptFallback,
 				fileStructure,
 				fileMapToString(pkgFileMap),
 			)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return stats, err
 			}
 		}
 
 		if strings.TrimSpace(pkgSummaryContent) == "" {
-			emptyPackageResponses = append(emptyPackageResponses, pkg)
+			stats.EmptyPackageResponses = append(stats.EmptyPackageResponses, pkg)
+			fmt.Fprintf(s.PrintTo, "[WARN] empty package summary\n")
+		} else {
+			fmt.Fprintf(s.PrintTo, "%s\n", pkgSummaryContent)
 		}
+		fmt.Fprintf(s.PrintTo, "\n")
 
 		if s.EmbeddingsService != nil {
-			ids, err := s.EmbeddingsService.Store.AddDocuments(
-				context.Background(),
+			ids, err := s.EmbeddingsService.Store.AddDocuments(ctx,
 				[]schema.Document{
 					{
 						PageContent: pkgSummaryContent,
@@ -171,23 +211,23 @@ func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []st
 				},
 			)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return stats, err
 			}
-			fmt.Printf("Succesfully pushed docs %s into embeddings vector store\n", ids)
+			fmt.Fprintf(s.PrintTo, "Succesfully pushed docs %s into embeddings vector store\n", ids)
 		}
 
 		readmeFilename := "README.md"
 		if !s.OverwriteReadme {
 			readmeFilename, err = getReadmePath(pkgDir)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return stats, err
 			}
 		}
 		if err := writeFile(
 			filepath.Join(pkgDir, readmeFilename),
 			pkgSummaryContent,
 		); err != nil {
-			return nil, nil, nil, nil, err
+			return stats, err
 		}
 
 		if s.WithFileSummary {
@@ -195,11 +235,11 @@ func (s *PackageRunnerService) RunPackages() ([]string, []string, []string, []st
 				filepath.Join(pkgDir, "FILES.md"),
 				fileMapToMd(pkgFileMap),
 			); err != nil {
-				return nil, nil, nil, nil, err
+				return stats, err
 			}
 		}
 	}
-	return fallbackFileResponses, emptyFileResponses, fallbackPackageResponses, emptyPackageResponses, nil
+	return stats, nil
 }
 
 func writeFile(path, content string) error {
@@ -251,23 +291,27 @@ func fileMapToString(fileMap map[string]string) string {
 	}
 	return content
 }
-func getDirFileStructure(workdir string) (string, error) {
-	content := fmt.Sprintf("%s directory file structure:\n", filepath.Base(filepath.Dir(workdir)))
+
+func getDirFileStructure(pkg, workdir string) (string, error) {
+	content := fmt.Sprintf("%s directory file structure:\n", pkg)
 	entries := []string{}
-	if err := util.WalkDirIgnored(workdir, "", func(path string, d fs.DirEntry) error {
-		if d.IsDir() {
+	if err := util.WalkDirIgnored(
+		workdir, filepath.Join(workdir, ".gitignore"),
+		func(path string, d fs.DirEntry) error {
+			if d.IsDir() {
+				return nil
+			}
+			relPath, err := filepath.Rel(workdir, path)
+			if err != nil {
+				return err
+			}
+			if strings.HasSuffix(path, ".md") {
+				return nil
+			}
+			entries = append(entries, relPath)
 			return nil
-		}
-		relPath, err := filepath.Rel(workdir, path)
-		if err != nil {
-			return err
-		}
-		if strings.HasSuffix(path, ".md") {
-			return nil
-		}
-		entries = append(entries, relPath)
-		return nil
-	}); err != nil {
+		},
+	); err != nil {
 		return "", err
 	}
 	slices.Sort(entries)
