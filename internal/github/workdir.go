@@ -173,7 +173,6 @@ func GithubWorkdir(
 		}
 
 		pullOptions := git.PullOptions{
-			RemoteURL:         repoURL,
 			Depth:             1,
 			SingleBranch:      true,
 			RecurseSubmodules: git.NoRecurseSubmodules,

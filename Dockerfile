@@ -11,6 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -tags=api -o reflexia_api .
 FROM alpine
 WORKDIR /
 
-COPY --from=builder /build/reflexia_api ./reflexia_api
+COPY --from=builder /build/reflexia_api /reflexia_api
+COPY --from=builder /build/project_config /project_config
 
 CMD ["/reflexia_api"]

@@ -91,16 +91,13 @@ func (s APIService) ReflectPost(ctx context.Context,
 	return nil
 }
 
-type ProjectConfigsInput struct {
-}
-
 type ProjectConfig struct {
 	FileFilter        []string `json:"file_filter"`
 	ProjectRootFilter []string `json:"project_root_filter"`
 }
 
 func (s APIService) ProjectConfigsGet(ctx context.Context,
-	input ProjectConfigsInput,
+	input struct{},
 	output *map[string]ProjectConfig,
 ) error {
 	pcs, err := project.ListProjectConfigs(s.Workdir)
