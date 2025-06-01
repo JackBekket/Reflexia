@@ -60,6 +60,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 	branch := ""
 
 	projectName := filepath.Base(workdir)
+	cancelFunc := func() {}
 
 	if o.LocalWorkdir != "" {
 		workdir = o.LocalWorkdir
@@ -68,7 +69,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 		}
 		projectName = filepath.Base(workdir)
 	} else if o.RepositoryURL != "" {
-		workdir, repo, branch, err = github.GithubWorkdir(
+		workdir, repo, branch, cancelFunc, err = github.GithubWorkdir(
 			workdir,
 			o.RepositoryURL,
 			o.RepositoryBranch,
@@ -76,6 +77,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 			o.GithubToken,
 		)
 		if err != nil {
+			cancelFunc()
 			return artifacts, fmt.Errorf("prepare github workdir: %w", err)
 		}
 		projectName = filepath.Base(filepath.Dir(workdir))
@@ -85,10 +87,12 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 		workdir, o.WithConfigFile, o.LightCheck,
 	)
 	if err != nil {
+		cancelFunc()
 		return artifacts, fmt.Errorf("get project config: %w", err)
 	}
 	projectConfig, err := o.ChooserFunc(projectConfigVariants)
 	if err != nil {
+		cancelFunc()
 		return artifacts, fmt.Errorf("choose project config: %w", err)
 	}
 
@@ -101,6 +105,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 		openai.WithAPIVersion("v1"),
 	)
 	if err != nil {
+		cancelFunc()
 		return artifacts, fmt.Errorf("openai.New: %w", err)
 	}
 	agent.LLM = llm
@@ -129,6 +134,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 			projectName,
 		)
 		if err != nil {
+			cancelFunc()
 			return artifacts, fmt.Errorf("new vector store: %w", err)
 		}
 
@@ -151,6 +157,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 
 	pkgFiles, err := projectConfig.BuildPackageFiles()
 	if err != nil {
+		cancelFunc()
 		return artifacts, fmt.Errorf("build package files: %w", err)
 	}
 
@@ -169,6 +176,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 
 	artifacts.PackageRunnerStats, err = packageRunnerService.RunPackages(ctx)
 	if err != nil {
+		cancelFunc()
 		return artifacts, fmt.Errorf("run packages: %w", err)
 	}
 
@@ -180,12 +188,14 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 			o.GithubToken,
 		)
 		if err != nil {
+			cancelFunc()
 			return artifacts, fmt.Errorf("creating pull request: %w", err)
 		}
 
 		artifacts.PullRequestURL = &prURL
 	}
 
+	cancelFunc()
 	return artifacts, nil
 }
 

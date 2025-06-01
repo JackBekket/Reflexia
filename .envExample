@@ -1,10 +1,10 @@
-EMBEDDINGS_AI_URL=https://api.swarmind.ai/lai/testing
+EMBEDDINGS_AI_URL=https://api.swarmind.ai/lai/testing/v1
 EMBEDDINGS_AI_TOKEN=""
 EMBEDDINGS_DB_URL=postgresql://...
 
 LIBAGENT_ENV_PREFIX=LIBAGENT
 
-LIBAGENT_AI_URL="https://api.swarmind.ai/lai/testing"
+LIBAGENT_AI_URL="https://api.swarmind.ai/lai/testing/v1"
 LIBAGENT_AI_TOKEN=""
 LIBAGENT_MODEL="big-tiger-gemma-27b-v1"
 
