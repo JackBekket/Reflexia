@@ -75,11 +75,11 @@ func readReflexiaCall(cfg config.Config) (reflexia.ReflexiaCall, error) {
 		log.Warn().Err(err).Msg("load .env file")
 	}
 
-	flag.StringVar(&cfg.CachePath, "a", cfg.CachePath, "cache folder path (defaults to .reflexia_cache)")
-	flag.StringVar(&cfg.EmbeddingsAIURL, "eu", cfg.EmbeddingsAIURL, "embeddings AI URL")
-	flag.StringVar(&cfg.EmbeddingsAIToken, "ea", cfg.EmbeddingsAIToken, "embeddings AI API Key")
-	flag.StringVar(&cfg.EmbeddingsDBURL, "ed", cfg.EmbeddingsDBURL, "embeddings pgxpool DB connect URL")
-	flag.StringVar(&cfg.EmbeddingsSimSearchTestPrompt, "et", cfg.EmbeddingsSimSearchTestPrompt, "embeddings similarity search validation test prompt")
+	flag.StringVar(&cfg.CachePath, "cache-path", cfg.CachePath, "cache folder path (defaults to .reflexia_cache)")
+	flag.StringVar(&cfg.EmbeddingsAIURL, "embeddings-url", cfg.EmbeddingsAIURL, "embeddings AI URL")
+	flag.StringVar(&cfg.EmbeddingsAIToken, "embeddings-token", cfg.EmbeddingsAIToken, "embeddings AI API Key")
+	flag.StringVar(&cfg.EmbeddingsDBURL, "embeddings-db", cfg.EmbeddingsDBURL, "embeddings pgxpool DB connect URL")
+	flag.StringVar(&cfg.EmbeddingsSimSearchTestPrompt, "embeddings-test-prompt", cfg.EmbeddingsSimSearchTestPrompt, "embeddings similarity search validation test prompt")
 
 	agentCfg, err := agentConfig.NewConfig()
 	if err != nil {
@@ -94,45 +94,51 @@ func readReflexiaCall(cfg config.Config) (reflexia.ReflexiaCall, error) {
 	}
 
 	reflexiaOpts.GithubToken = os.Getenv("GH_TOKEN")
-	flag.StringVar(&reflexiaOpts.RepositoryURL, "g", "", "valid link for github repository")
-	flag.StringVar(&reflexiaOpts.RepositoryBranch, "b", "", "optional branch for github repository")
-	flag.StringVar(&reflexiaOpts.GithubUsername, "u", "", "github username for ssh auth")
-	flag.StringVar(&reflexiaOpts.GithubToken, "t", reflexiaOpts.GithubToken, "github token for ssh auth")
+	flag.StringVar(&reflexiaOpts.RepositoryURL, "gh-url", "", "valid link for github repository")
+	flag.StringVar(&reflexiaOpts.RepositoryBranch, "branch", "", "optional branch for github repository")
+	flag.StringVar(&reflexiaOpts.GithubUsername, "gh-username", "", "github username for ssh auth")
+	flag.StringVar(&reflexiaOpts.GithubToken, "gh-token", reflexiaOpts.GithubToken, "github token for ssh auth")
 
-	flag.StringVar(&reflexiaOpts.WithConfigFile, "l", "", "config filename in project_config to use")
-	flag.StringVar(&reflexiaOpts.ExactPackages, "p", "", "exact package names, ',' delimited")
+	flag.StringVar(&reflexiaOpts.WithConfigFile, "cfg", "", "config filename in project_config to use")
+	flag.StringVar(&reflexiaOpts.ExactPackages, "pkgs", "", "exact package names, ',' delimited")
 
-	flag.BoolFunc("w",
+	flag.BoolFunc("gh-preserve-workdir",
+		"do not remove github repository workdir (only for CLI mode)",
+		func(_ string) error {
+			reflexiaOpts.PreserveGithubWorkdir = true
+			return nil
+		})
+	flag.BoolFunc("pr",
 		"do a commit to a _autodoc suffixed branch and raise a PR",
 		func(_ string) error {
 			reflexiaOpts.CreatePR = true
 			return nil
 		})
-	flag.BoolFunc("c",
+	flag.BoolFunc("light-check",
 		"do not check project root folder specific files such as go.mod or package.json",
 		func(_ string) error {
 			reflexiaOpts.LightCheck = true
 			return nil
 		})
-	flag.BoolFunc("f",
+	flag.BoolFunc("use-files",
 		"save individual file summary intermediate result to the FILES.md",
 		func(_ string) error {
 			reflexiaOpts.WithFileSummary = true
 			return nil
 		})
-	flag.BoolFunc("r",
+	flag.BoolFunc("ow-readme",
 		"overwrite README.md instead of README_GENERATED.md creation/overwrite",
 		func(_ string) error {
 			reflexiaOpts.OverwriteReadme = true
 			return nil
 		})
-	flag.BoolFunc("d",
+	flag.BoolFunc("ow-cache",
 		"overwrite generated summary caches",
 		func(_ string) error {
 			reflexiaOpts.OverwriteCache = true
 			return nil
 		})
-	flag.BoolFunc("e", "Use Embeddings",
+	flag.BoolFunc("embeddings", "Use Embeddings",
 		func(_ string) error {
 			reflexiaOpts.UseEmbeddings = true
 			return nil

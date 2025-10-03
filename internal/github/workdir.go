@@ -22,6 +22,7 @@ func GithubWorkdir(
 	branch,
 	githubUsername,
 	githubToken string,
+	workdirPreserve bool,
 ) (string, *git.Repository, string, func(), error) {
 	u, err := url.ParseRequestURI(repoURL)
 	if err != nil {
@@ -101,8 +102,12 @@ func GithubWorkdir(
 	var repo *git.Repository
 
 	cancelFunc := func() {
-		if err := os.RemoveAll(workdir); err != nil {
-			log.Warn().Err(err).Msg("cancel func remove workdir")
+		if workdirPreserve {
+			log.Warn().Msgf("github workdir preserved: %s", workdir)
+		} else {
+			if err := os.RemoveAll(workdir); err != nil {
+				log.Warn().Err(err).Msg("cancel func remove workdir")
+			}
 		}
 	}
 

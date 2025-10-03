@@ -45,24 +45,24 @@ A tool for analyzing and managing software projects, providing both an API and C
 
 | Flag | Description |
 |------|-------------|
-| `-a` | Cache folder path (default: `.reflexia_cache`) |
-| `-eu` | Embeddings AI URL |
-| `-ea` | Embeddings AI API Key |
-| `-ed` | Embeddings DB connect URL |
-| `-et` | Embeddings similarity test prompt |
-| `-g` | GitHub repository URL |
-| `-b` | GitHub repository branch |
-| `-u` | GitHub username for SSH auth |
-| `-t` | GitHub token for SSH auth (overrides `GH_TOKEN`) |
-| `-l` | Config filename in `project_config` to use |
-| `-p` | Exact package names (comma delimited) |
-| `-w` | Create PR (implies `ReflexiaOpts.CreatePR = true`) |
-| `-c` | Skip project root checks (implies `ReflexiaOpts.LightCheck = true`) |
-| `-f` | Save file summaries to `FILES.md` (implies `ReflexiaOpts.WithFileSummary = true`) |
-| `-r` | Overwrite `README.md` (implies `ReflexiaOpts.OverwriteReadme = true`) |
-| `-d` | Overwrite cache (implies `ReflexiaOpts.OverwriteCache = true`) |
-| `-e` | Use embeddings (implies `ReflexiaOpts.UseEmbeddings = true`) |
-
+| `-cache-path` | Cache folder path (default: `.reflexia_cache`) |
+| `-embeddings-url` | Embeddings AI URL |
+| `-embeddings-token` | Embeddings AI API Key |
+| `-embeddings-db` | Embeddings DB connect URL |
+| `-embeddings-test-prompt` | Embeddings similarity test prompt |
+| `-gh-url` | GitHub repository URL |
+| `-gh-username` | GitHub username for SSH auth |
+| `-gh-token` | GitHub token for SSH auth (overrides `GH_TOKEN`) |
+| `-gh-preserve-workdir` | do not remove github repository workdir (only for CLI mode) |
+| `-branch` | GitHub repository branch |
+| `-cfg` | Config filename in `project_config` to use |
+| `-pkgs` | Exact package names (comma delimited) |
+| `-pr` | Create PR (implies `ReflexiaOpts.CreatePR = true`) |
+| `-light-check` | Skip project root checks (implies `ReflexiaOpts.LightCheck = true`) |
+| `-use-files` | Save file summaries to `FILES.md` (implies `ReflexiaOpts.WithFileSummary = true`) |
+| `-ow-readme` | Overwrite `README.md` (implies `ReflexiaOpts.OverwriteReadme = true`) |
+| `-ow-cache` | Overwrite cache (implies `ReflexiaOpts.OverwriteCache = true`) |
+| `-embeddings` | Use embeddings (implies `ReflexiaOpts.UseEmbeddings = true`) |
 ---
 
 ## ⚠ Limitations & Notes

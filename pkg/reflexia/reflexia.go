@@ -22,19 +22,20 @@ import (
 )
 
 type ReflexiaCall struct {
-	LocalWorkdir     string
-	RepositoryURL    string
-	RepositoryBranch string
-	GithubUsername   string
-	GithubToken      string
-	WithConfigFile   string
-	ExactPackages    string
-	CreatePR         bool
-	LightCheck       bool
-	WithFileSummary  bool
-	UseEmbeddings    bool
-	OverwriteReadme  bool
-	OverwriteCache   bool
+	LocalWorkdir          string
+	PreserveGithubWorkdir bool
+	RepositoryURL         string
+	RepositoryBranch      string
+	GithubUsername        string
+	GithubToken           string
+	WithConfigFile        string
+	ExactPackages         string
+	CreatePR              bool
+	LightCheck            bool
+	WithFileSummary       bool
+	UseEmbeddings         bool
+	OverwriteReadme       bool
+	OverwriteCache        bool
 
 	Config      config.Config
 	AgentConfig agentConfig.Config
@@ -75,6 +76,7 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 			o.RepositoryBranch,
 			o.GithubUsername,
 			o.GithubToken,
+			o.PreserveGithubWorkdir,
 		)
 		if err != nil {
 			cancelFunc()
