@@ -32,11 +32,11 @@ func NewVectorStoreWithPreDelete(
 	llm, err := openai.New(
 		openai.WithBaseURL(aiURL),
 		openai.WithToken(aiToken),
-		openai.WithEmbeddingModel("text-embedding-ada-002"),
+		openai.WithEmbeddingModel("text-embedding-all-minilm-l6-v2-embedding"),
 		openai.WithAPIVersion("v1"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("new openai: %w", err)
+		return nil, fmt.Errorf("new llm_provider: %w", err)
 	}
 
 	e, err := embeddings.NewEmbedder(llm)
