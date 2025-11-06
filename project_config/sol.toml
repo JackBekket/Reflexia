@@ -1,7 +1,6 @@
-# ── настройка «фильтров» файлов и каталогов
 file_filter        = [".sol"]
-project_root_filter= ["*.sol", "contracts/*.sol","hardhat.config.ts"]
-module_match       = "sol_package"
+project_root_filter= ["contracts/", "hardhat.config.ts", "hardhat.config.js", "truffle.config.js", "foundry.toml"]
+module_match       = "directory"
 stop_words         = ["<end_of_output>"]
 
 [prompts.default]

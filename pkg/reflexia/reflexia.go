@@ -36,6 +36,7 @@ type ReflexiaCall struct {
 	UseEmbeddings         bool
 	OverwriteReadme       bool
 	OverwriteCache        bool
+	DryRun                bool
 
 	Config      config.Config
 	AgentConfig agentConfig.Config
@@ -86,16 +87,23 @@ func (o ReflexiaCall) Run(ctx context.Context) (ReflexiaArtifacts, error) {
 	}
 
 	projectConfigVariants, err := project.GetProjectConfig(
-		workdir, o.WithConfigFile, o.LightCheck,
+		workdir, o.WithConfigFile, o.LightCheck, o.PrintTo,
 	)
 	if err != nil {
 		cancelFunc()
 		return artifacts, fmt.Errorf("get project config: %w", err)
 	}
+
 	projectConfig, err := o.ChooserFunc(projectConfigVariants)
 	if err != nil {
 		cancelFunc()
 		return artifacts, fmt.Errorf("choose project config: %w", err)
+	}
+
+	fmt.Fprintf(o.PrintTo, "Selected config: %s\n", projectConfig.Filename)
+
+	if o.DryRun {
+		return artifacts, nil
 	}
 
 	agent := &simple.Agent{}

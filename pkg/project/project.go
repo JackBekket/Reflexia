@@ -17,6 +17,8 @@ import (
 )
 
 type ProjectConfig struct {
+	Filename string
+
 	FileFilter        []string                        `toml:"file_filter"`
 	ProjectRootFilter []string                        `toml:"project_root_filter"`
 	ModuleMatch       string                          `toml:"module_match"`
@@ -34,7 +36,7 @@ type ProjectConfigPrompts struct {
 }
 
 func GetProjectConfig(
-	currentDirectory, withConfigFile string, lightCheck bool,
+	currentDirectory, withConfigFile string, lightCheck bool, printTo io.Writer,
 ) (map[string]*ProjectConfig, error) {
 	if _, err := os.Stat("project_config"); os.IsNotExist(err) {
 		if _, err := os.Stat(withConfigFile); err == nil {
@@ -62,6 +64,8 @@ func GetProjectConfig(
 
 	var projectConfigVariants = map[string]*ProjectConfig{}
 	for filename, config := range projectConfigs {
+		config.Filename = filename
+
 		foundFilterFiles, err := hasFilterFiles(currentDirectory, config.FileFilter)
 		if err != nil {
 			return nil, fmt.Errorf("has filter files: %w", err)
@@ -72,11 +76,16 @@ func GetProjectConfig(
 			continue
 		}
 
-		foundRootFilterFile, err := hasRootFilterFile(currentDirectory, config.ProjectRootFilter)
+		foundRootFilterFiles, err := hasRootFilterFile(currentDirectory, config.ProjectRootFilter)
 		if err != nil {
 			return nil, fmt.Errorf("has root filter file: %w", err)
 		}
-		if foundFilterFiles && foundRootFilterFile {
+		if foundFilterFiles && len(foundRootFilterFiles) > 0 {
+			fmt.Fprintf(printTo, "Found project root filters:\n")
+			for _, foundRootFilter := range foundRootFilterFiles {
+				fmt.Fprintf(printTo, "\t%s\n", foundRootFilter)
+			}
+			fmt.Fprintf(printTo, "\n")
 			projectConfigVariants[filename] = &config
 		}
 	}
@@ -120,7 +129,7 @@ func (pc *ProjectConfig) BuildPackageFiles() (map[string][]string, error) {
 			pc.RootPath,
 			filepath.Join(pc.RootPath, ".gitignore"),
 			func(path string, d fs.DirEntry) error {
-				if filepath.Dir(path) == pc.RootPath || path == pc.RootPath {
+				if filepath.Dir(path) == pc.RootPath || path == pc.RootPath || d.IsDir() {
 					return nil
 				}
 				for _, filter := range pc.FileFilter {
@@ -203,16 +212,17 @@ func hasFilterFiles(workdir string, filters []string) (bool, error) {
 	return found, nil
 }
 
-func hasRootFilterFile(workdir string, filters []string) (bool, error) {
+func hasRootFilterFile(workdir string, filters []string) ([]string, error) {
+	foundFilters := []string{}
 	for _, filter := range filters {
 		if _, err := os.Stat(filepath.Join(workdir, filter)); err != nil {
 			if !os.IsNotExist(err) {
-				return false, err
+				return []string{}, err
 			}
 		} else {
-			return true, nil
+			foundFilters = append(foundFilters, filter)
 		}
 	}
 
-	return false, nil
+	return foundFilters, nil
 }

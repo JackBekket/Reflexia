@@ -138,6 +138,12 @@ func readReflexiaCall(cfg config.Config) (reflexia.ReflexiaCall, error) {
 			reflexiaOpts.OverwriteCache = true
 			return nil
 		})
+	flag.BoolFunc("dry-run",
+		"only check if project language is determined",
+		func(_ string) error {
+			reflexiaOpts.DryRun = true
+			return nil
+		})
 	flag.BoolFunc("embeddings", "Use Embeddings",
 		func(_ string) error {
 			reflexiaOpts.UseEmbeddings = true
